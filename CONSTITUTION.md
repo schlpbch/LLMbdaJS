@@ -71,12 +71,22 @@ this: an *ad hoc*, scenario-driven discovery process found one bug early
 on; a systematic, rule-by-rule audit later found seven more. Thoroughness
 found what intuition missed.
 
-## 7. 100% statement/function/line coverage, enforced
+## 7. 100% statement/function/line coverage and a full typecheck, enforced
 
 Every statement, function, and line in `src/` is exercised by
 `examples/*.ts`, and `pnpm run coverage` fails the build
 (`c8 --check-coverage --statements 100 --functions 100 --lines 100
 --branches 99`) if that regresses — this is a CI gate, not an aspiration.
+`pnpm run typecheck` (`tsconfig.examples.json`) additionally typechecks
+every file `pnpm run build` doesn't — `examples/` and `test/`, which
+`tsc -p tsconfig.json` never covers (`include: ["src/**/*.ts"]`). Both
+gates exist because they've each already caught a real defect this way:
+`typecheck` was added specifically after `pnpm run build` was found to
+exit 0 with a deliberately-injected, obvious type error sitting in an
+example file, and immediately found one genuine (if minor) type error
+already present in a coverage-focused example. "It runs under `tsx`" is
+not the same claim as "it typechecks" — `tsx` transpiles, it doesn't
+verify.
 Branch coverage is held to 99%, not 100%, only because a small, named set
 of branches are genuinely unreachable through any well-typed program (a
 `binop` case no longer constructible through the fully-typed `BinOp`

@@ -23,6 +23,8 @@ noninterferent."
 ```bash
 pnpm install
 pnpm run build               # tsc -p tsconfig.json — strict build, checks src/ only
+pnpm run typecheck            # tsc -p tsconfig.examples.json — typechecks src/+examples/+test/,
+                              # the files pnpm run build doesn't (examples/ isn't in tsconfig.json's include)
 pnpm test                    # node --import tsx test/run.ts — runs every examples/*.ts as pass/fail
 pnpm run coverage             # same suite, instrumented with c8 (text + html report in coverage/)
 pnpm run example:postcode
@@ -103,13 +105,17 @@ concrete, not aspirational; several are CI-enforced.
   directly (see git history around commit `63cff57` for the pattern) is
   enough — it doesn't need to become a permanent example unless it catches
   something.
-- **Article 7 (100% coverage, enforced).** Run `pnpm run coverage` — it
-  must exit 0 (`c8 --check-coverage --statements 100 --functions 100
-  --lines 100 --branches 99`). If it fails: either the change needs a
-  test, or the newly-uncovered code is genuinely unreachable, in which
-  case extend `CONSTITUTION.md` Article 7's named list with the specific
-  file:line and the reason — never loosen the threshold numbers to make
-  the build pass.
+- **Article 7 (100% coverage + full typecheck, enforced).** Run
+  `pnpm run coverage` — it must exit 0 (`c8 --check-coverage --statements
+  100 --functions 100 --lines 100 --branches 99`). If it fails: either
+  the change needs a test, or the newly-uncovered code is genuinely
+  unreachable, in which case extend `CONSTITUTION.md` Article 7's named
+  list with the specific file:line and the reason — never loosen the
+  threshold numbers to make the build pass. Also run
+  `pnpm run typecheck` — it must exit 0. `pnpm run build` alone is not
+  enough: it only checks `src/`, not `examples/`/`test/`, and a
+  deliberately-injected type error in an example was confirmed to slip
+  past it silently before `typecheck` existed.
 - **Article 8 (honest audit-scope framing).** If summarizing an audit
   pass (to the user, in a commit message, or in docs), state what was
   specifically checked ("rule-by-rule against §3/§5/§B", "lattice laws

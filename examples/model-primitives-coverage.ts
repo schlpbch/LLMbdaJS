@@ -70,7 +70,8 @@ async function directJsonParsing() {
   ];
   for (const [name, json] of cases) {
     const expr = defaultParse(json);
-    const ok = expr.kind === "array" && expr.items.length === 2 && expr.items[0]!.value.kind === "bool" && (expr.items[0]!.value as any).value === true;
+    const okFlag = expr.kind === "array" ? expr.items[0] : undefined;
+    const ok = okFlag !== undefined && okFlag.kind === "scalar" && okFlag.value.kind === "bool" && okFlag.value.value === true;
     console.log(ok ? "PASS" : "FAIL", `defaultParse top-level ${name}:`, JSON.stringify(expr));
     if (!ok) process.exit(1);
   }
