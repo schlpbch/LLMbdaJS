@@ -54,14 +54,14 @@ examples/   — one file per worked scenario or regression test, each run by
 
 ## Bugs this port found in itself
 
-Two rounds of a rule-by-rule audit against the paper's exact formal text
-(not just scenario testing) found seven real divergences between this
-port and the spec, all fixed, each with a regression test verified to
-actually fail against the pre-fix code. The common thread: **the paper's
-semantics is substitution-based** (`e[x := e′]`), not environment-based,
-and most of these are a different place where that translation dropped
-something the substitution reading requires — silently, since TypeScript
-can't catch it.
+Three rounds of a rule-by-rule audit against the paper's exact formal
+text (not just scenario testing) found eight real divergences between
+this port and the spec, all fixed, each with a regression test verified
+to actually fail against the pre-fix code. The common thread: **the
+paper's semantics is substitution-based** (`e[x := e′]`), not
+environment-based, and most of these are a different place where that
+translation dropped something the substitution reading requires —
+silently, since TypeScript can't catch it.
 
 | # | Bug | Fix | Regression test |
 |---|---|---|---|
@@ -72,6 +72,7 @@ can't catch it.
 | 5 | `recv` evaluated a freshly-parsed (attacker-influenceable) response against the **caller's entire local environment** merged with the prelude, instead of the prelude alone (`M.parse(r)[M.preludeEnv]`) — a full label-system bypass via variable-name collision for any sufficiently expressive `Model.parse`. | Evaluate against `preludeEnv` alone. | `recv-scope-isolation.ts` |
 | 6 | `camelLattice.readersFlowsTo` had its confidentiality direction inverted: a value restricted to a few readers was wrongly allowed to flow into a fully public destination (a real leak via the ordinary `send` check), and bottom failed to flow into restricted destinations (violating `∀l, ⊥ ⊑ l`). | Check the source's `unrestricted` case before the destination's. | `camel-readers-flowsto.ts` |
 | 7 | `mod`/`!=` were constructible via the `BinOp` type but never wired into `binopPrimName`/`defaultPrimEval` — always threw regardless of operands. Not a security bug (fails loudly), but a real gap against the paper's `+\|−\|×\|÷\|mod\|=\|<\|>\|≤\|≥` grammar. | Wire both through end to end as ordinary primitives. | `missing-binops.ts` |
+| 8 | Record literals used a plain `Map`, so a duplicate field name silently took the *last* occurrence's value — the spec's `lookup(f, f⃗)` explicitly requires "a duplicate field is shadowed by the first". Each field's expression is still evaluated in order (side effects from a shadowed field must still fire), only the stored value was wrong. | Only store a field's value the first time its name is seen. | `record-duplicate-field.ts` |
 
 No guarantee even two audit passes were exhaustive — this is precisely
 why the Lean development remains the actual source of truth for the

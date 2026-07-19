@@ -275,12 +275,20 @@ export async function evaluate<L>(
       return { conv, value: { label: pc, value: expr.value } };
 
     case "record": {
+      // §B.1: lookup(f, f⃗) "returns the value of the first field named f
+      // in the field list f⃗ (a duplicate field is shadowed by the
+      // first)". Every field's expression is still evaluated in order —
+      // side effects (send/recv inside a field's value) are preserved
+      // regardless of which value wins for lookup — but a plain
+      // `Map.set` on every entry would silently let the LAST occurrence
+      // of a duplicate key win instead, the opposite of what the spec
+      // requires. Only store a field if this name hasn't been seen yet.
       let c = conv;
       const fields = new Map<string, Labeled<L>>();
       for (const [name, fieldExpr] of expr.fields) {
         const r = await evaluate(model, oracle, run, pc, c, fieldExpr, env);
         c = r.conv;
-        fields.set(name, r.value);
+        if (!fields.has(name)) fields.set(name, r.value);
       }
       return { conv: c, value: { label: pc, value: { kind: "record", fields } } };
     }

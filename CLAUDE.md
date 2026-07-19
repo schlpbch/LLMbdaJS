@@ -41,6 +41,7 @@ pnpm run example:recv-scope-isolation
 pnpm run example:binop-prim-consistency
 pnpm run example:camel-readers-flowsto
 pnpm run example:missing-binops
+pnpm run example:record-duplicate-field
 ```
 
 There is no separate lint step and no per-test filtering flag — `test/run.ts`
@@ -88,42 +89,28 @@ stored value unchanged and silently drops that taint.
 
 This exact gap was found and fixed in `var`/`field` (`⇓-ArrayIndex` already
 did it correctly) — regression test `examples/var-pc-confinement.ts` — and
-then found again, independently, in four more places during a rule-by-rule
-audit against the paper's exact text: `labelDyn`/`labelTest`/`labelAssert`/
-`endorse` all used a value's *shallow* label where the spec's
-`flatten(V)=n:v` requires `deepLabel(V)` (regression test
-`examples/deep-label-confinement.ts`); `prim`/`binop` skipped `wrapValues`
-on their result, crashing on later field access into a composite output
-(regression test `examples/prim-wrap-values.ts`); `binop` additionally
-skipped `stripLabels` before calling `primEval`, unlike `prim` right next
-to it (regression test `examples/binop-prim-consistency.ts`); and `recv`
-merged the *caller's entire local environment* into scope for a freshly
-parsed (attacker-influenceable) response instead of `preludeEnv` alone, a
-complete label-system bypass via name collision rather than a missing join
-(regression test `examples/recv-scope-isolation.ts`). A second audit pass
-over `lattice.ts` itself then found `camelLattice.readersFlowsTo` had its
-confidentiality direction inverted — a restricted-to-a-few-readers value
-was wrongly allowed to flow into a fully public destination, an actual
-leak reachable through the ordinary `send` check, not just a bottom-law
-violation (regression test `examples/camel-readers-flowsto.ts`). The
-same pass also found `mod`/`!=` constructible via the `BinOp` type but
-never wired into `binopPrimName`/`defaultPrimEval` at all — not a
-security bug (fails loudly), but a real gap against the paper's own
-`+|−|×|÷|mod|=|<|>|≤|≥` grammar (regression test
-`examples/missing-binops.ts`). See "Bugs this port found in itself" in
-`README.md` for the full writeup of all seven.
+then found again, independently, in seven more places across three
+rounds of a rule-by-rule audit against the paper's exact text, spanning
+`evaluator.ts` (rule implementations), `lattice.ts` (a lattice instance's
+internal correctness), and the completeness of the primitive table
+against the paper's grammar. See "Bugs this port found in itself" in
+`README.md` for the full table (8 instances, each with its regression
+test) — don't re-describe them here; keep that table as the one place
+this list lives.
+
 **When touching `evaluator.ts`, especially any case that reads a value out
 of an environment/record/array rather than constructing one fresh, or that
 calls `Model.primEval`/`Model.toLabel`, check it against the exact paper
 rule text — when adding or touching a `Lattice`/`FactoredLattice`
 instance, sanity-check `flowsTo(bottom, x)` holds for representative `x`,
-not just that `join` is idempotent/commutative — and when adding a
-construct to `ast.ts`'s type surface, confirm it's actually wired through
-`evaluator.ts`, not just type-constructible.** Seven instances of this
-bug class have been found so far
-(implicit flow through an untaken/already-bound path, or an
-insufficiently-isolated evaluation context), and there is no guarantee
-that was exhaustive.
+not just that `join` is idempotent/commutative — when adding a construct
+to `ast.ts`'s type surface, confirm it's actually wired through
+`evaluator.ts`, not just type-constructible — and when a construct
+collects entries into a `Map`/similar keyed structure (records, envs),
+check the spec's stated tie-breaking rule (e.g. record field lookup is
+first-wins) rather than assuming whatever the host collection's default
+overwrite behavior happens to be.** There is no guarantee three audit
+passes were exhaustive.
 
 ### Design choices worth knowing about (see README.md for full rationale)
 
