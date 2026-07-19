@@ -80,45 +80,126 @@ examples/
   camel-provenance-quarantine.ts — Appendix D.5, the CaMeL-style Sources×Readers
                                lattice exercised end to end (a second lattice
                                instance, not just the {U,S} running example)
+  deep-label-confinement.ts    — regression test for the deepLabel fix in
+                               labelDyn/labelTest/labelAssert/endorse; see
+                               "Bugs this port found in itself" below
+  prim-wrap-values.ts          — regression test for the wrapValues fix in
+                               prim/binop; see "Bugs this port found in itself"
+  recv-scope-isolation.ts      — regression test for the recv scope-leak fix;
+                               see "Bugs this port found in itself"
+  binop-prim-consistency.ts    — regression test for binop/prim consistency
+                               (strip-before, wrap-after); see below
 
 test/run.ts    — runs every examples/*.ts as a pass/fail suite
 ```
 
-## A bug this port found in itself
+## Bugs this port found in itself
 
-While building the prelude module, tracing through §3's `⇓-App` rule
-carefully surfaced a real semantic gap: **the paper's semantics is
-substitution-based** (`e[x := e′]`, §3), not environment-based. When a
-value gets substituted into a body that runs under a *raised* `pc` (e.g.
-inside a secret-tainted `if` branch), re-encountering that value during
-evaluation implicitly re-joins the current `pc` via the `⇓-Labelled`/
-`⇓-Lam` rules — a substitution-calculus artifact with no natural
-counterpart in an environment/closure implementation.
+Twice now — once while building the prelude module, and again during a
+deliberate rule-by-rule audit against the paper's formal semantics —
+tracing through the exact wording of a rule surfaced a real gap between
+what this port's `evaluator.ts` did and what the paper requires. Every
+instance below was fixed, given a regression test that was verified to
+actually fail against the pre-fix code before being committed against
+the fixed version (not a rubber stamp), and is left documented here
+rather than quietly squashed, because the pattern connecting them is the
+whole point: **the paper's semantics is substitution-based**
+(`e[x := e′]`, §3), not environment-based, and every one of these bugs
+is a different place where that translation dropped something the
+substitution-based reading requires without ever raising a type error —
+TypeScript happily compiles an environment lookup that forgets to rejoin
+a label, or a helper that never sees the concrete lattice it needs.
 
-This port originally used environments (the standard, practical way to
-implement a substitution-based calculus without literal substitution),
-and `var` lookup / record `.field` access both simply returned the
-stored value unchanged — silently dropping exactly the taint the
-paper's Confinement lemma (`pc ⊑ ℓ(V)`, Lemma 1) guarantees can never be
-dropped. It's a second instance of the same *implicit-flow-through-an-
-untaken-path* bug class as the paper's own Fenton/Denning gadget (§1,
-§3.4) that the `send` rule exists to close — just reached through a
-closure captured outside a tainted branch and called from inside one,
-rather than through an assignment.
+### 1. Confinement: `var`/`field` not rejoining the ambient `pc` (found first)
 
-**Both sites are fixed** (`evaluator.ts`, `var` and `field` cases now
-join the ambient `pc` / container label into the returned value, the
-same way `⇓-ArrayIndex` already correctly did). `examples/var-pc-
-confinement.ts` is the regression test, and — to make sure it's a real
-test and not a rubber stamp — it was verified to actually fail against
-the pre-fix code before being committed against the fixed version.
+Re-encountering a substituted value under a *raised* `pc` (e.g. inside a
+secret-tainted `if` branch) implicitly rejoins the current `pc` via the
+`⇓-Labelled`/`⇓-Lam` rules in the paper's substitution-based reading — an
+artifact with no natural counterpart in an environment/closure
+implementation. `var` lookup and record `.field` access both simply
+returned the stored value unchanged, silently dropping exactly the taint
+Confinement (Lemma 1, `pc ⊑ ℓ(V)`) guarantees can never be dropped. A
+second instance of the same *implicit-flow-through-an-untaken-path* bug
+class as the paper's own Fenton/Denning gadget (§1, §3.4) that `send`'s
+no-high-upgrade check exists to close — reached through a closure
+captured outside a tainted branch and called from inside one, rather
+than through an assignment. Fixed in `evaluator.ts`'s `var` and `field`
+cases, matching what `⇓-ArrayIndex` already did correctly.
+Regression test: `examples/var-pc-confinement.ts`.
 
-The honest framing: this is exactly the class of subtle divergence the
-original plan warned "port the algorithm, not just the syntax" about,
-and it's worth keeping in mind that other, still-undiscovered instances
-of the same pattern may exist elsewhere in this port. This is precisely
-why the Lean development remains the actual source of truth for the
-security theorem, not this repository.
+### 2. Four rules using a shallow label where the spec requires `deepLabel`
+
+`⇓-LabelFlow`, `⇓-LabelTest`, `⇓-LabelAssert`, and `⇓-Endorse` all require
+`flatten(V₁) = n:v₁`, where `n = deepLabel(V₁)` — the join of *every*
+label nested anywhere inside the evaluated value, not just its own
+top-level label. `send` and `prim` used the `deepLabel` helper already
+defined in `evaluator.ts`; `labelDyn`, `labelTest`, `labelAssert`, and
+`endorse` used the value's shallow `.label` instead. Concretely
+demonstrable: a policy value built from a secretly-tainted sub-part
+(e.g. one element of an array individually wrapped in a higher
+`labelLit`) has that taint invisible to its own top-level label, so an
+`assert` the spec requires to be refused (`n ⊑ pc` fails) instead
+silently succeeded. A third instance of the same confinement-violation
+class as bug 1, found this time by comparing every rule against the
+paper's exact text rather than by an end-to-end attack scenario.
+Regression test: `examples/deep-label-confinement.ts`.
+
+### 3. `prim`/`binop` results missing `wrapValues`, crashing on field access
+
+`⇓-Prim` requires a primitive's output to be passed through `wrapValues`,
+which stamps `⊥` onto every nested record field / array element. Neither
+`stripLabels` nor `Model.primEval` have access to a concrete `Lattice<L>`
+to know what `⊥` actually is for a given run, so composite results (from
+`recordUpdate` and `shape`, the two built-in primitives that return
+records) ended up with nested fields carrying no *valid* label at all —
+reading one of those fields back out unconditionally joins the
+container's label with the field's, and joining with "no label" isn't
+joining with the lattice's bottom (the join-identity element), it's a
+`TypeError`. Not a leak — a crash — but a real availability bug and a
+structural gap: `wrapValues` has to live in `evaluator.ts`, where `lat`
+is actually in scope, not in the lattice-agnostic `model.ts` helpers.
+Regression test: `examples/prim-wrap-values.ts`.
+
+### 4. `binop` skipping the strip/wrap steps `prim` does right next to it
+
+§B.1 defines `e1 ⊕ e2 ≜ prim "binop_⊕" [e1, e2]`, so `binop` and `prim`
+must treat their argument identically. `prim` stripped labels before
+calling `primEval` and wrapped the result after; `binop`, evaluated by
+the same interpreter, did neither. Invisible with the packaged
+`defaultPrimEval` (which ignores labels), but a real spec divergence and
+an internal inconsistency between two cases in the same file, latent for
+any primitive table that does inspect labels.
+Regression test: `examples/binop-prim-consistency.ts`.
+
+### 5. `recv` merging the caller's local scope into LLM-generated code
+
+`⇓-Recv` evaluates a freshly-parsed response as `M.parse(r)[M.preludeEnv]`
+— only prelude identifiers are substituted into it; nothing in the rule
+gives a parsed response access to the calling program's own local
+bindings. The interpreter instead evaluated the parsed response against
+`mergeEnv(env, preludeEnv)` — the *caller's entire current environment*,
+merged with the prelude. Since a `recv`'d response is by construction
+attacker-influenceable content, a sufficiently expressive `Model.parse`
+(a full LLMbda-syntax parser — exactly what an agent that "writes code"
+as its plan needs, per §7.1's description of the paper's own Randori
+agent) could resolve a bare variable reference in the response straight
+to a same-named local binding of the calling program: a complete bypass
+of the label system via name collision, not merely a mislabeling.
+`defaultParse` (JSON-only) can't emit a `var` AST node, so no example
+using it was ever exposed to this — the regression test exercises it
+with a `parse` that can. Arguably the most severe of the five: not a
+missing join, but an entire unintended channel. Fixed by evaluating
+against `preludeEnv` alone.
+Regression test: `examples/recv-scope-isolation.ts`.
+
+The honest framing, said once and still true after finding four more:
+this is exactly the class of subtle divergence the original plan warned
+"port the algorithm, not just the syntax" about. A systematic pass found
+four further instances beyond the first, which is itself evidence that
+*ad hoc* discovery (as bug 1 was) isn't enough — and there is no
+guarantee this pass was exhaustive either. This is precisely why the
+Lean development remains the actual source of truth for the security
+theorem, not this repository.
 
 ## Design choices worth knowing about
 
@@ -184,6 +265,10 @@ pnpm run example:endorse
 pnpm run example:camel-provenance
 pnpm run example:dynamic-label
 pnpm run example:clear-isolation
+pnpm run example:deep-label-confinement
+pnpm run example:prim-wrap-values
+pnpm run example:recv-scope-isolation
+pnpm run example:binop-prim-consistency
 ```
 
 ## Where this could go

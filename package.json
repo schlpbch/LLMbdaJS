@@ -17,7 +17,11 @@
     "example:endorse": "node --import tsx examples/endorse.ts",
     "example:camel-provenance": "node --import tsx examples/camel-provenance-quarantine.ts",
     "example:dynamic-label": "node --import tsx examples/dynamic-label.ts",
-    "example:clear-isolation": "node --import tsx examples/clear-isolation.ts"
+    "example:clear-isolation": "node --import tsx examples/clear-isolation.ts",
+    "example:deep-label-confinement": "node --import tsx examples/deep-label-confinement.ts",
+    "example:prim-wrap-values": "node --import tsx examples/prim-wrap-values.ts",
+    "example:recv-scope-isolation": "node --import tsx examples/recv-scope-isolation.ts",
+    "example:binop-prim-consistency": "node --import tsx examples/binop-prim-consistency.ts"
   },
   "devDependencies": {
     "c8": "^12.0.0",

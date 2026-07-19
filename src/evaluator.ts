@@ -142,7 +142,19 @@ export async function evaluate<L>(
       // came from automatically, with no special-casing of `parse` and
       // no way for an adversarial response to escape its source label
       // (Confinement, Lemma 1: pc ⊑ ℓ(V) always holds on the way out).
-      return evaluate(model, oracle, run, newConv.label, newConv, parsedExpr, mergeEnv(env, preludeEnv));
+      //
+      // Deliberately evaluated against `preludeEnv` alone, NOT
+      // `mergeEnv(env, preludeEnv)`. The paper's rule is
+      // `M.parse(r)[M.preludeEnv]` (§3.3) — only prelude identifiers are
+      // substituted into a freshly-parsed response. The calling
+      // program's own local bindings (`env`) must stay invisible to
+      // LLM-generated code; otherwise a response that happens to
+      // reference a name colliding with a caller-local variable (e.g. a
+      // full LLMbda-syntax parser emitting a bare `var` node) resolves
+      // straight to that binding's value — a complete bypass of the
+      // label system via name collision, not merely a mislabeling. See
+      // examples/recv-scope-isolation.ts for the regression test.
+      return evaluate(model, oracle, run, newConv.label, newConv, parsedExpr, preludeEnv);
     }
 
     case "fork": {
@@ -178,7 +190,13 @@ export async function evaluate<L>(
       const l1 = await evaluate(model, oracle, run, pc, conv, expr.labelExpr, env);
       const decoded = model.toLabel(l1.value.value);
       if (decoded === undefined) throw new RuntimeError("labelDyn: e1 value is not a valid label");
-      const targetPc = lat.join(pc, lat.join(l1.value.label, decoded));
+      // ⇓-LabelFlow: n = deepLabel(V1), the join of every label nested
+      // anywhere inside the label-describing value — not just its own
+      // shallow/top-level label. A label literal built from tainted
+      // sub-parts (e.g. an array whose individual elements are
+      // separately labelLit'd) must have that taint counted here, or it
+      // silently escapes the pc-raise this rule exists to perform.
+      const targetPc = lat.join(pc, lat.join(deepLabel(lat, l1.value), decoded));
       const inner = await evaluate(model, oracle, run, targetPc, l1.conv, expr.expr, env);
       return { conv: inner.conv, value: inner.value };
     }
@@ -187,7 +205,10 @@ export async function evaluate<L>(
       const policy = await evaluate(model, oracle, run, pc, conv, expr.policy, env);
       const decoded = model.toLabel(policy.value.value);
       if (decoded === undefined) throw new RuntimeError("labelTest: e1 value is not a valid label");
-      const n = policy.value.label;
+      // ⇓-LabelTest: n = deepLabel(V1) — see the identical note in
+      // labelDyn above; the policy value's deep taint, not just its
+      // shallow label, must raise pc for evaluating the tested data.
+      const n = deepLabel(lat, policy.value);
       const data = await evaluate(model, oracle, run, lat.join(pc, n), policy.conv, expr.expr, env);
       const b = lat.flowsTo(data.value.label, decoded);
       // Result is labeled at pc ⊔ n ⊔ l — the *policy threshold*, not the
@@ -204,7 +225,11 @@ export async function evaluate<L>(
       const policy = await evaluate(model, oracle, run, pc, conv, expr.policy, env);
       const decoded = model.toLabel(policy.value.value);
       if (decoded === undefined) throw new RuntimeError("labelAssert: e1 value is not a valid label");
-      const n = policy.value.label;
+      // ⇓-LabelAssert: n = deepLabel(V1) — a policy threshold assembled
+      // from secretly-tainted sub-parts must itself be treated as
+      // secret-influenced (n ⊑ pc below), or a secret can determine
+      // which policy gets checked without the check itself ever firing.
+      const n = deepLabel(lat, policy.value);
       if (!lat.flowsTo(n, pc)) {
         throw new SecurityError(`assert: policy label ${lat.show(n)} does not flow to pc ${lat.show(pc)}`);
       }
@@ -228,7 +253,9 @@ export async function evaluate<L>(
         );
       }
       const e1 = await evaluate(model, oracle, run, pc, conv, expr.target, env);
-      const n = e1.value.label;
+      // ⇓-Endorse: n = deepLabel(V1) — see the identical note in
+      // labelDyn/labelTest/labelAssert above.
+      const n = deepLabel(lat, e1.value);
       const l1 = model.toLabel(e1.value.value);
       if (l1 === undefined) throw new RuntimeError("endorse: e1 value is not a valid label");
       const e2 = await evaluate(model, oracle, run, lat.join(pc, n), e1.conv, expr.expr, env);
@@ -303,7 +330,18 @@ export async function evaluate<L>(
       const a = await evaluate(model, oracle, run, pc, conv, expr.arg, env);
       const stripped = stripLabels(a.value.value);
       const result = model.primEval(expr.name, stripped);
-      return { conv: a.conv, value: { label: lat.join(pc, deepLabel(lat, a.value)), value: result } };
+      // ⇓-Prim requires the result be passed through wrapValues, which
+      // stamps ⊥ onto every nested record field / array element —
+      // primEval's own well-formedness obligation is to return a
+      // completely label-free term, but neither stripLabels nor
+      // Model.primEval have access to a concrete Lattice<L> to know what
+      // "label-free" (⊥) actually is for this run, so that stamping has
+      // to happen here, where `lat` is in scope. Skipping this step
+      // leaves nested fields with no valid label at all, which crashes
+      // the next `field`/`index` access into the result (see
+      // examples/prim-wrap-values.ts).
+      const wrapped = wrapValues(lat, result);
+      return { conv: a.conv, value: { label: lat.join(pc, deepLabel(lat, a.value)), value: wrapped } };
     }
 
     // ---------------- derived forms (desugared here, not at parse time) ----------------
@@ -327,6 +365,12 @@ export async function evaluate<L>(
     }
 
     case "binop": {
+      // §B.1: e1 ⊕ e2 ≜ prim "binop_⊕" [e1, e2] — this case must treat
+      // the packed-array argument identically to how `case "prim"`
+      // treats its own argument (strip before calling primEval, wrap
+      // the result after), or a custom Model.primEval that legitimately
+      // inspects labels sees differently-shaped input depending on
+      // whether the caller wrote `prim(...)` or used `⊕` sugar.
       const l = await evaluate(model, oracle, run, pc, conv, expr.left, env);
       const r = await evaluate(model, oracle, run, pc, l.conv, expr.right, env);
       const opName = binopPrimName(expr.op);
@@ -337,10 +381,12 @@ export async function evaluate<L>(
           { label: r.value.label, value: r.value.value },
         ],
       };
-      const result = model.primEval(opName, arg);
+      const stripped = stripLabels(arg);
+      const result = model.primEval(opName, stripped);
+      const wrapped = wrapValues(lat, result);
       return {
         conv: r.conv,
-        value: { label: lat.join(pc, lat.join(l.value.label, r.value.label)), value: result },
+        value: { label: lat.join(pc, lat.join(l.value.label, r.value.label)), value: wrapped },
       };
     }
   }
@@ -394,6 +440,33 @@ function stripLabels(bv: BareValue): BareValue {
   }
   if (bv.kind === "array") {
     return { kind: "array", items: bv.items.map((it) => ({ label: undefined, value: stripLabels(it.value) })) as never };
+  }
+  return bv;
+}
+
+/**
+ * wrapValues(e) — §B.1: lift the label-free output of a primitive back
+ * into the labelled-value grammar, stamping ⊥ onto every record field
+ * and array element, however deeply nested; scalars are left unchanged.
+ * The stamps are neutral (⊥ ⊔ l = l), so they record no taint of their
+ * own — this exists only so nested fields have a *valid* label of the
+ * concrete type L at all (stripLabels erases to a placeholder that
+ * isn't a real L), not to encode any information.
+ */
+function wrapValues<L>(lat: import("./lattice.js").Lattice<L>, bv: BareValue): BareValue {
+  if (bv.kind === "record") {
+    const fields = new Map<string, Labeled<L>>();
+    for (const [k, f] of bv.fields) {
+      const fv = asL<L>(f).value;
+      fields.set(k, { label: lat.bottom, value: wrapValues(lat, fv) });
+    }
+    return { kind: "record", fields: fields as never };
+  }
+  if (bv.kind === "array") {
+    return {
+      kind: "array",
+      items: bv.items.map((it) => ({ label: lat.bottom, value: wrapValues(lat, asL<L>(it).value) })) as never,
+    };
   }
   return bv;
 }

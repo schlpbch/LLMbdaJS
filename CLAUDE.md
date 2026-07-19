@@ -35,6 +35,10 @@ pnpm run example:endorse
 pnpm run example:camel-provenance
 pnpm run example:dynamic-label
 pnpm run example:clear-isolation
+pnpm run example:deep-label-confinement
+pnpm run example:prim-wrap-values
+pnpm run example:recv-scope-isolation
+pnpm run example:binop-prim-consistency
 ```
 
 There is no separate lint step and no per-test filtering flag — `test/run.ts`
@@ -80,15 +84,29 @@ value inside a `pc`-raised context implicitly taints it via
 `⇓-Labelled`/`⇓-Lam`, but a naive environment lookup just returns the
 stored value unchanged and silently drops that taint.
 
-This exact gap was found and fixed once already (`evaluator.ts`, the `var`
-and `field` cases now join the ambient `pc`/container label, matching what
-`⇓-ArrayIndex` already did correctly). `examples/var-pc-confinement.ts` is
-the regression test. **When touching `evaluator.ts`, especially any case
-that reads a value out of an environment/record/array rather than
-constructing one fresh, check whether it needs the same `pc`-join** — this
-is the specific bug class (implicit flow through an untaken/already-bound
-path) that both this bug and the paper's own Fenton/Denning gadget belong
-to.
+This exact gap was found and fixed in `var`/`field` (`⇓-ArrayIndex` already
+did it correctly) — regression test `examples/var-pc-confinement.ts` — and
+then found again, independently, in four more places during a rule-by-rule
+audit against the paper's exact text: `labelDyn`/`labelTest`/`labelAssert`/
+`endorse` all used a value's *shallow* label where the spec's
+`flatten(V)=n:v` requires `deepLabel(V)` (regression test
+`examples/deep-label-confinement.ts`); `prim`/`binop` skipped `wrapValues`
+on their result, crashing on later field access into a composite output
+(regression test `examples/prim-wrap-values.ts`); `binop` additionally
+skipped `stripLabels` before calling `primEval`, unlike `prim` right next
+to it (regression test `examples/binop-prim-consistency.ts`); and `recv`
+merged the *caller's entire local environment* into scope for a freshly
+parsed (attacker-influenceable) response instead of `preludeEnv` alone, a
+complete label-system bypass via name collision rather than a missing join
+(regression test `examples/recv-scope-isolation.ts`). See "Bugs this port
+found in itself" in `README.md` for the full writeup of all five.
+**When touching `evaluator.ts`, especially any case that reads a value out
+of an environment/record/array rather than constructing one fresh, or that
+calls `Model.primEval`/`Model.toLabel`, check it against the exact paper
+rule text** — five instances of this bug class have been found so far
+(implicit flow through an untaken/already-bound path, or an
+insufficiently-isolated evaluation context), and there is no guarantee
+that was exhaustive.
 
 ### Design choices worth knowing about (see README.md for full rationale)
 
