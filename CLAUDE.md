@@ -43,6 +43,7 @@ pnpm run example:camel-readers-flowsto
 pnpm run example:missing-binops
 pnpm run example:record-duplicate-field
 pnpm run example:index-non-integer
+pnpm run example:deep-label-closure-env
 ```
 
 There is no separate lint step and no per-test filtering flag — `test/run.ts`

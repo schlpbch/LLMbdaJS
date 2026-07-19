@@ -426,12 +426,31 @@ function asFactoredLattice<L>(model: Model<L>): FactoredLattice<L, unknown, unkn
   return undefined;
 }
 
-/** deepLabel(V) — the join of every label occurring anywhere inside V, §3.3. */
+/**
+ * deepLabel(V) — the join of every label occurring anywhere inside V,
+ * §3.3: "however deeply nested (record fields, array elements, even
+ * lambda bodies)". In the paper's substitution-based semantics, a
+ * closure's body is an ordinary Expr that may contain literal `l:v`
+ * labeled-value subterms wherever an earlier application substituted
+ * them in — so deepLabel must walk it like any other structure. This
+ * port is environment-based: a closure doesn't carry substituted values
+ * in its (unevaluated) `body` Expr at all, they live in its captured
+ * `env` instead — so the environment-based analog of "recursing into
+ * lambda bodies" is recursing into the closure's captured environment.
+ * Missing this let a secret captured by a closure (e.g. `let secret =
+ * [S]:v in let fn = \_.secret in send {holder: fn}`) leave deepLabel
+ * returning ⊥ for the sent record — Confinement violated indirectly via
+ * conv.label under-tainting, not by a leaked message body (closures
+ * serialise to an opaque placeholder), but by every later `recv` on that
+ * conversation then evaluating at a too-low pc. See
+ * examples/deep-label-closure-env.ts.
+ */
 function deepLabel<L>(lat: import("./lattice.js").Lattice<L>, v: Labeled<L>): L {
   let acc = v.label;
   const visit = (bv: BareValue): void => {
     if (bv.kind === "record") for (const f of bv.fields.values()) { const fl = asL<L>(f); acc = lat.join(acc, fl.label); visit(fl.value); }
     if (bv.kind === "array") for (const it of bv.items) { const il = asL<L>(it); acc = lat.join(acc, il.label); visit(il.value); }
+    if (bv.kind === "closure") for (const cl of bv.env.values()) { const cv = asL<L>(cl); acc = lat.join(acc, cv.label); visit(cv.value); }
   };
   visit(v.value);
   return acc;

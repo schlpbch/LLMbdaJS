@@ -25,7 +25,8 @@
     "example:camel-readers-flowsto": "node --import tsx examples/camel-readers-flowsto.ts",
     "example:missing-binops": "node --import tsx examples/missing-binops.ts",
     "example:record-duplicate-field": "node --import tsx examples/record-duplicate-field.ts",
-    "example:index-non-integer": "node --import tsx examples/index-non-integer.ts"
+    "example:index-non-integer": "node --import tsx examples/index-non-integer.ts",
+    "example:deep-label-closure-env": "node --import tsx examples/deep-label-closure-env.ts"
   },
   "devDependencies": {
     "c8": "^12.0.0",
