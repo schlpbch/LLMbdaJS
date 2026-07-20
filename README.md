@@ -55,6 +55,9 @@ examples/   — one file per worked scenario or regression test, each run by
 
 ## Design choices worth knowing about
 
+See `docs/adr/` for the full reasoning and alternatives considered behind
+each of these.
+
 - **`quarantine`/`robust_endorse`/`bounded_endorse` are object-language
   closures** (`prelude.ts`), not host TS functions — agent-generated code
   can only call names bound in the object language's environment.

@@ -181,7 +181,7 @@ first-wins) rather than assuming whatever the host collection's default
 overwrite behavior happens to be.** There is no guarantee three audit
 passes were exhaustive.
 
-### Design choices worth knowing about (see README.md for full rationale)
+### Design choices worth knowing about (see README.md for full rationale; see docs/adr/ for the individual decision write-ups)
 
 - `quarantine`/`robust_endorse`/`bounded_endorse` are built as
   object-language `Expr` closures in `prelude.ts` (registered in

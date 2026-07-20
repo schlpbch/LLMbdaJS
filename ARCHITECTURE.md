@@ -2,7 +2,8 @@
 
 This document describes how the pieces of `src/` fit together at runtime.
 For the theoretical background and the paper section each module
-implements, see `README.md`; for repo-wide conventions, see `CLAUDE.md`.
+implements, see `README.md`; for repo-wide conventions, see `CLAUDE.md`;
+for the reasoning behind individual design decisions, see `docs/adr/`.
 
 ## Big picture
 
