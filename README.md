@@ -41,8 +41,8 @@ example and a positive `endorse` test).
 
 ## Project Principles
 
-The development of this port is guided by eight non-negotiable principles
-documented in [`CONSTITUTION.md`](CONSTITUTION.md). Read it to understand:
+The development of this port is guided by eight principles documented in
+[`CONSTITUTION.md`](CONSTITUTION.md). Please read it to understand:
 
 - How fidelity to the paper's formal text is maintained
 - Why claims about what the interpreter does or doesn't guarantee are carefully
@@ -52,7 +52,7 @@ documented in [`CONSTITUTION.md`](CONSTITUTION.md). Read it to understand:
 
 ## Structure
 
-```
+```text
 src/
   ast.ts         — Expr/Value AST + TS-native builder functions (§3.1, §3.2, §B.1)
   lattice.ts     — Lattice<L>/FactoredLattice<L,I,S> + the {U,S}-powerset and
