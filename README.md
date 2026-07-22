@@ -12,9 +12,9 @@ and presented in their paper
 [_"The LLMbda Calculus: AI Agents, Conversations, and Information Flow"_](https://arxiv.org/abs/2602.20064)
 (arXiv:2602.20064, July 2026).
 
-## The LLMbda in a Nutshell
+## The LLMbda Calculus in a Nutshell
 
-The LLMbda is an **untyped call-by-value lambda calculus** that makes
+The LLMbda Calculus is an **untyped call-by-value lambda calculus** that makes
 provenance-based defense both expressible and provably sound, without committing
 to an architecture. It adds the **operational core of agentic systems as
 first-class constructs**: prompt-response conversations that can be forked and
