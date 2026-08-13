@@ -4,7 +4,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/schlpbch/LLMbdaJS/badges/coverage.json)](https://github.com/schlpbch/LLMbdaJS/actions/workflows/ci.yml)
 
-A TypeScript reference implementation of the **LLMbda calculus** by
+A TypeScript implementation of the **LLMbda calculus** by
 [Zachary Garby](https://zacgarby.co.uk/),
 [Andrew D Gordon](https://AndrewDGordon.github.io), and
 [David Sands](https://www.cse.chalmers.se/~dave/Homepage_David_Sands/Home.html)
