@@ -158,4 +158,4 @@ shall be the current focus.
 
 ## Legalese
 
-Copyright, 2026 - Andreas Schlapbach
+Copyright, 2026 - Andreas Schlapbach (asc.engineering)
