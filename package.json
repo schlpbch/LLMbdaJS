@@ -3,6 +3,17 @@
   "version": "0.2.2",
   "description": "A TypeScript reference implementation of the LLMbda calculus (Garby, Gordon, Sands 2026) — a labeled, dynamically information-flow-tracked lambda calculus for agentic LLM programs. NOT a proof: the noninterference theorem (TIPNI) is machine-checked only in the paper's Lean development. This port re-implements the operational semantics and tests the security-critical rules against the paper's own leak examples, but carries no formal guarantee.",
   "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -14,10 +25,11 @@
   },
   "author": "Andreas Schlapbach",
   "scripts": {
+    "prepublishOnly": "pnpm run build",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.examples.json",
     "test": "node --import tsx test/run.ts",
-    "coverage": "c8 --all --src src --include \"src/**/*.ts\" --exclude \"test/**\" --exclude \"examples/**\" --reporter text --reporter html --reporter json-summary --check-coverage --statements 100 --functions 100 --lines 100 --branches 99 node --import tsx test/run.ts",
+    "coverage": "c8 --all --src src --include \"src/**/*.ts\" --exclude \"test/**\" --exclude \"examples/**\" --exclude \"src/index.ts\" --reporter text --reporter html --reporter json-summary --check-coverage --statements 100 --functions 100 --lines 100 --branches 99 node --import tsx test/run.ts",
     "example:postcode": "node --import tsx examples/postcode.ts",
     "example:retry": "node --import tsx examples/retry-loop.ts",
     "example:leak": "node --import tsx examples/fenton-denning-leak.ts",

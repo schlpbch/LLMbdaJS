@@ -96,6 +96,11 @@ asserted in the abstract. A change that drops coverage must either add
 the missing test or, if the newly-uncovered code is *also* genuinely
 unreachable, extend that named, justified list — never silently loosen
 the threshold to make the build pass.
+`src/index.ts` (the package's public entry point, added for npm
+publishing) is excluded from coverage instrumentation entirely: it is a
+pure re-export barrel with no executable logic of its own to exercise —
+every symbol it re-exports is already covered at its point of
+definition in the module it comes from.
 
 ## 8. Honesty about what auditing this codebase has and hasn't shown
 
