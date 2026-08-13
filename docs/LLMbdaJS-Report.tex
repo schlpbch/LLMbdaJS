@@ -1,4 +1,4 @@
-\documentclass[10pt, a4paper]{article}
+\documentclass[11pt, a4paper]{article}
 
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
@@ -16,7 +16,6 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage{cleveref}
 \usepackage{xspace}
-\usepackage{fullpage}
 
 \definecolor{codebg}{RGB}{237,237,233}
 \definecolor{codeaccent}{RGB}{47,111,94}
@@ -59,10 +58,10 @@
 
 
 \title{The \LLMbda Calculus: Information Flow Control for LLM Agent
-Programs: A TypeScript Reference Implementation}
-\author{Andreas Schlapbach \email{schlpbch@gmail.com}
+Programs: A TypeScript Implementation}
+\author{Andreas Schlapbach \\ \href{mailto:schlpbch@gmail.com}{schlpbch@gmail.com}
 }
-\date{}
+\date{August 13th, 2026}
 
 \begin{document}
 
@@ -73,8 +72,7 @@ Programs: A TypeScript Reference Implementation}
 Giving a large language model access to tools like reading email, browsing the
 	web or  writing files turns it into a program whose control flow is
 	steered by whatever text it most recently read. This report introduces
-	the \emph{LLMbda calculus} of Garby, Gordon \& Sands:
-	: a labeled,
+	the \emph{LLMbda calculus} of Garby, Gordon \& Sands: a labeled,
 	dynamically information-flow-tracked lambda calculus extended with
 	first-class conversation primitives (\lstinline{send},
 	\lstinline{recv}, \lstinline{fork}, \lstinline{clear}) for exactly this
@@ -83,8 +81,9 @@ Giving a large language model access to tools like reading email, browsing the
 	declassification via \lstinline{endorse}. Then it describes a
 	TypeScript reference implementation, the specific implementation
 	choices that implementation made, and what the port does and does not
-	establish. Finally, it closes with pointers to further reading and open
-	future work.
+	establish. It discusses explicit design decisions made to target the
+	TypeScript language. Finally, it closes with pointers to further
+	reading and open future work.
 
 \end{abstract}
 
@@ -111,10 +110,8 @@ the wrong question here:
     in between checking whether that particular combination is okay.
 \end{itemize}
 
-Permissions are typically checked once, at the API boundary. What is
-missing is tracking \emph{where a piece of data has been} as it moves
-through the program.
-
+Permissions are typically checked once, at the API boundary. What is missing is
+tracking \emph{where a piece of data has been} as it moves through the program.
 Two shapes of failure are common in this setting:
 
 \begin{description}
@@ -172,7 +169,7 @@ confidentiality.
 Labels need an algebra, not just a set as one must be able to ask ``does
 information flow from label $a$ to label $b$?''
 
-\begin{tabular}{lll@{4cm}}
+\begin{tabular}{@{}p{2cm}p{4.8cm}p{6.7cm}@{}}
 \toprule
 Operation & Meaning & Description \\
 \midrule
@@ -394,11 +391,10 @@ $pc$ it was evaluated under.
 pc \flowsto \ell(V)
 \]
 
-This is what makes ``generated code cannot quietly act with more
-authority than the context it came from'' a checkable statement rather
-than a hope. It is also exactly the property that a naive
-environment-based implementation can accidentally violate --- see
-Section~\ref{sec:env-not-subst}.
+This is what makes ``generated code cannot quietly act with more authority than
+the context it came from'' a checkable statement rather than a hope. It is also
+exactly the property that a naive environment-based implementation can
+accidentally violate --- see Section~\ref{sec:env-not-subst}.
 
 \subsection{Informal Noninterference}
 
@@ -409,10 +405,10 @@ are indistinguishable. Which means that nothing secret leaked into what that
 observer can tell, whether through data, control flow, or timing of visible
 effects. 
 
-The paper states and machine-checks three
-versions of this for the calculus --- TIPNI, Insulated TIPNI, and
-oracular correctness --- in Lean~4. What that does and does not mean for
-this TypeScript port is the subject of Section~\ref{sec:limits}.
+The paper states and machine-checks three versions of this for the calculus ---
+TIPNI, Insulated TIPNI, and oracular correctness --- in Lean~4. What that does
+and does not mean for this TypeScript port is the subject of
+Section~\ref{sec:limits}.
 
 % ---------------------------------------------------------------------
 \section{Declassification}
@@ -555,7 +551,7 @@ disciplines are complementary: static enforcement pre-execution, and a
 noninterference guarantee such as  \LLMbda's for whatever dynamic
 behaviour a static check cannot rule out ahead of time.
 
-\subsection{Where  \LLMbda differs}
+\subsection{Where  \LLMbda Differs}
 
 \small
 \begin{tabular}{@{}p{2.2cm}p{3.8cm}p{3.8cm}p{4.7cm}@{}}
@@ -606,10 +602,10 @@ published utility/security trade-off of the group on a shared benchmark.
 A caller assembles two things and gets a pure function:
 
 \begin{lstlisting}
-Model<L>                               Oracle
-(parse/serialise/primEval/toLabel)     (respond: history-> string)        
-                \                         /
-                 \                       /
+Model<L>                                  Oracle
+(parse/serialise/primEval/toLabel)        (respond: history-> string)        
+                \                              /
+                 \                            /
      evaluate(model, oracle, run, pc, conv, expr, env)
                                 |
                                 v
@@ -625,165 +621,166 @@ where
 	  otherwise a pure recursive function.}
 \end{itemize}
 
-\subsection{Design Decisions}
 
+\subsection{Architectural Design Decisions}
 
-\subsubsection{ADR-1: Environments implement substitution semantics, with explicit `pc` re-join on reads}
+The following subsections describe the major design decisions made in this
+port, and the rationale behind them. They are not a claim that the paper's
+original design was wrong, but rather a record of where the TypeScript
+implementation diverged from it, and why.
 
-The paper's big-step semantics (§3/§5/§B) is defined over **substitution**
-(`e[x := e′]`): a variable occurrence is *replaced* by the value it's bound to,
-so re-encountering that value under a subsequently-raised `pc` implicitly
-taints it via `⇓-Labelled`/`⇓-Lam`.  This port uses environments (name → value
-maps) instead, which is the standard practical technique for implementing a
-substitution calculus — substitution itself is not something you want to
-actually perform on every function application.
+\subsubsection{ADR-1: Environments implement substitution semantics}
 
-The catch: a naive environment lookup (`var`, record `.field` access) just
-returns whatever value was stored at bind time, unchanged. Under substitution
-semantics, a value read out from inside a `pc`-raised context is retroactively
-part of that context and picks up its taint; under naive environment lookup, it
-silently doesn't. This gap was found in `var`/`field` (`⇓-ArrayIndex` already
-did it correctly), fixed, and then found again independently in further spots
-across three rounds of a rule-by-rule audit — see `evaluator.ts`/`lattice.ts`
-git history and `examples/var-pc-confinement.ts`.
+The paper's big-step semantics (§3/§5/§B) is defined over \emph{substitution}
+($e[x := e']$): a variable occurrence is \emph{replaced} by the value it is
+bound to, so re-encountering that value under a subsequently-raised \texttt{pc}
+implicitly taints it via
+\texttt{$\Downarrow$-Labelled}/\texttt{$\Downarrow$-Lam}. This port uses
+environments (name $\to$ value maps) instead, which is the standard practical
+technique for implementing a substitution calculus --- substitution itself is
+not something one wants to actually perform on every function application.
+
+The catch: a naive environment lookup (\texttt{var}, record \texttt{.field}
+access) just returns whatever value was stored at bind time, unchanged. Under
+substitution semantics, a value read out from inside a \texttt{pc}-raised
+context is retroactively part of that context and picks up its taint; under
+naive environment lookup, it silently does not. This gap was found in
+\texttt{var}/\texttt{field} (\texttt{$\Downarrow$-ArrayIndex} already did it
+correctly), fixed, and then found again independently in further spots across
+three rounds of a rule-by-rule audit --- see the
+\texttt{evaluator.ts}/\texttt{lattice.ts} git history and
+\texttt{examples/var-pc-confinement.ts}.
 
 \emph{Decision}: Keep the environment-based implementation (rewriting to a
 substitution interpreter would be a much larger, higher-risk change for no
-semantic benefit), but treat "does this case need to re-join the ambient `pc`
-into the returned value's label" as a mandatory question for every case that
-*reads* a value out of an existing structure — environment, record, array —
-rather than constructing one fresh. This is now a standing check called out in
-`CLAUDE.md` for anyone adding a new evaluation rule.
+semantic benefit), but treat ``does this case need to re-join the ambient
+\texttt{pc} into the returned value's label'' as a mandatory question for every
+case that \emph{reads} a value out of an existing structure --- environment,
+record, array --- rather than constructing one fresh. This is now a standing
+check called out in \texttt{CLAUDE.md} for anyone adding a new evaluation rule.
 
 
-\subsubsection{ADR-2: Prelude functions are object-language closures, not host
-TS functions}
+\subsubsection{ADR-2: Prelude functions are object-language closures}
 
-`fix`, `quarantine`, `robust_endorse`, and `bounded_endorse` (§C.5, §5.1, §E.2,
-§E.3) need to be callable from code the interpreter did not write — strings an
-LLM returns via `recv`, parsed by `Model.parse` into an `Expr`. Parsed code can
-only reference names bound in *that `Expr`'s environment*; it has no way to
-reach an arbitrary host-language (TS) function, no matter how it's registered.
+\texttt{fix}, \texttt{quarantine}, \texttt{robust\_endorse}, and
+\texttt{bounded\_endorse} (§C.5, §5.1, §E.2, §E.3) need to be callable from
+code the interpreter did not write --- strings an LLM returns via
+\texttt{recv}, parsed by \texttt{Model.parse} into an \texttt{Expr}. Parsed
+code can only reference names bound in \emph{that \texttt{Expr}'s environment};
+it has no way to reach an arbitrary host-language (TS) function, no matter how
+it is registered.
 
-`bounded_endorse` has an additional constraint: per §E.3, its trust domain must
-be a fixed, static list baked in at construction time — a runtime-computed
-domain would forfeit the paper's log₂n leakage bound.  That rules out
-implementing it as a single reusable `Expr` the way
-`fix`/`quarantine`/`robust_endorse` are.
+\texttt{bounded\_endorse} has an additional constraint: per §E.3, its trust
+domain must be a fixed, static list baked in at construction time --- a
+runtime-computed domain would forfeit the paper's $\log_2 n$ leakage bound.
+That rules out implementing it as a single reusable \texttt{Expr} the way
+\texttt{fix}/\texttt{quarantine}/\texttt{robust\_endorse} are.
 
-\emph{Decision:} Define `fix`, `quarantine`, and `robust_endorse` in
-`prelude.ts` as `Expr` values built from the same AST constructors used
-everywhere else (`ast.ts`), exposed as a name→`Expr` map via
-`Model.preludeSource`, and merged into scope for both the top-level program and
-every parsed `recv` response (mirroring §3.3's `M.preludeEnv`). Define
-`bounded_endorse` as a *builder function* that takes the static trust domain at
-construction time and returns an `Expr`, rather than as a single fixed prelude
-entry.
-
-
-\subsubsection{ADR-3: No `weight`/probability tracking and no "fuel" argument}
+\emph{Decision:} Define \texttt{fix}, \texttt{quarantine}, and
+\texttt{robust\_endorse} in \texttt{prelude.ts} as \texttt{Expr} values built
+from the same AST constructors used everywhere else (\texttt{ast.ts}), exposed
+as a name$\to$\texttt{Expr} map via \texttt{Model.preludeSource}, and merged
+into scope for both the top-level program and every parsed \texttt{recv}
+response (mirroring §3.3's \texttt{M.preludeEnv}). Define
+\texttt{bounded\_endorse} as a \emph{builder function} that takes the static
+trust domain at construction time and returns an \texttt{Expr}, rather than as
+a single fixed prelude entry.
 
 
-The paper's Lean 4 development carries a `weight`/probability parameter through
-its big-step judgment (needed for its probabilistic semantics and the
-machine-checked noninterference proofs) and a "fuel" argument (a standard
+\subsubsection{ADR-3: No \texttt{weight}/probability tracking and no ``fuel''
+argument}
+
+The paper's Lean 4 development carries a \texttt{weight}/probability parameter
+through its big-step judgment (needed for its probabilistic semantics and the
+machine-checked noninterference proofs) and a ``fuel'' argument (a standard
 technique to make an otherwise-partial evaluation function total for Lean's
-termination checker). Neither is part of what the calculus *computes* — both
-are proof-engineering artifacts of doing the semantics in a proof assistant.
+termination checker). Neither is part of what the calculus \emph{computes} ---
+both are proof-engineering artifacts of doing the semantics in a proof
+assistant.
 
-\emph{Decision}: Omit both from this port. `evaluate` is an ordinary (possibly
-non-terminating, like any interpreter) TypeScript function; it doesn't track a
-weight and doesn't take or decrement a fuel parameter.
-
-
-\subsubsection{ADR-4: Labels are homogeneous per run; `BareValue` stores
-`Labeled<unknown>`}
-
-`evaluate` is generic over the label type `L` (`Lattice<L>`/ `Model<L>`), but
-composite runtime values — record fields, array elements — need to store
-labeled sub-values too. Threading `L` through `BareValue` generically
-(`Labeled<L>` everywhere a labeled value can appear, recursively) would work,
-but it means every data-shape type in `ast.ts` becomes generic in `L`, for a
-distinction that is never actually exercised: a single `evaluate()` call always
-closes over exactly one concrete `Model<L>`, so every label a given run ever
-produces already has the same concrete `L`.
-
-\emph{Decision}: `BareValue`'s record/array fields store `Labeled<unknown>`
-rather than `Labeled<L>`. Soundness of treating those `unknown` labels as the
-run's actual `L` comes from a single `asL<L>()` cast at the point in
-`evaluator.ts` where it matters, rather than from the type system proving it
-structurally throughout `ast.ts`.
+\emph{Decision}: Omit both from this port. \texttt{evaluate} is an ordinary
+(possibly non-terminating, like any interpreter) TypeScript function; it does
+not track a weight and does not take or decrement a fuel parameter.
 
 
-\subsubsection{ADR-5: `endorse`'s `FactoredLattice` requirement is a runtime
-check, not a type constraint}
+\subsubsection{ADR-4: Labels are homogeneous per run}
 
-`endorse` (§E.2/§E.3) needs to decompose a label into its integrity and
-confidentiality components, which only a `FactoredLattice<L,I,S>` (not every
-`Lattice<L>`) can do. Some `Model<L>` instances (e.g. ones built around a
-lattice that never needs `endorse`) only implement the plain `Lattice<L>`
-interface. The two options were: require every `Model<L>` to supply a
-`FactoredLattice`, even when unused, or let `Model<L>.lattice` be a plain
-`Lattice<L>` and treat the extra factoring capability as something checked when
-`endorse` is actually reached.
+\texttt{evaluate} is generic over the label type \texttt{L}
+(\texttt{Lattice<L>}/\texttt{Model<L>}), but composite runtime values ---
+record fields, array elements --- need to store labeled sub-values too.
+Threading \texttt{L} through \texttt{BareValue} generically
+(\texttt{Labeled<L>} everywhere a labeled value can appear, recursively) would
+work, but it means every data-shape type in \texttt{ast.ts} becomes generic in
+\texttt{L}, for a distinction that is never actually exercised: a single
+\texttt{evaluate()} call always closes over exactly one concrete
+\texttt{Model<L>}, so every label a given run ever produces already has the
+same concrete \texttt{L}.
 
-\emph{Decision}: `Model<L>.lattice` is typed as `Lattice<L>`. `endorse`
-requires it to also implement `FactoredLattice`; `evaluator.ts`'s
-`asFactoredLattice` does a runtime capability check (testing for `toIntegrity`/
-`toConfidentiality`/`pair`) and throws `RuntimeError` if it's missing, rather
-than the type system statically forbidding `endorse` on a non-factored model.
-
-
-\subsubsection{ADR-6: Default `parse`/`serialise` is naive JSON, not a
-grammar-constrained parser}
-
-Every `send`/`recv` crosses the `Expr`↔string boundary through
-`Model.parse`/`Model.serialise`. The paper's §7.3 flags that a production
-deployment needs a grammar-constrained parser — one that can only ever produce
-a well-formed `Expr`, closing off a class of oracle-side attacks where a
-malicious or malfunctioning LLM response parses into something unintended.
-Building that parser is real, nontrivial work orthogonal to what this port
-exists to demonstrate (the evaluation semantics).
-
-\emph{Decision}: Ship `defaultParse`/`defaultSerialise` as
-`JSON.parse`/`JSON.stringify` wrapped in a try/catch, and document — in
-`README.md`'s design-choices list, `CLAUDE.md`, and here — that this is a
-known, deliberate gap (Article 4), not a claim that this is production-ready
-parsing.
+\emph{Decision}: \texttt{BareValue}'s record/array fields store
+\texttt{Labeled<unknown>} rather than \texttt{Labeled<L>}. Soundness of
+treating those \texttt{unknown} labels as the run's actual \texttt{L} comes
+from a single \texttt{asL<L>()} cast at the point in \texttt{evaluator.ts}
+where it matters, rather than from the type system proving it structurally
+throughout \texttt{ast.ts}.
 
 
-\subsubsection{ADR-7: `fork` snapshots the conversation instead of gating
-access to it}
+\subsubsection{ADR-5: \texttt{endorse}'s \texttt{FactoredLattice} requirement
+is a runtime check}
 
-`send`, `recv`, and `clear` all gate access to `LabeledConversation<L>` by
-checking `flowsTo(pc, conv.label)` before touching it, then updating
-`conv.label` to reflect the new taint. `fork` is different in kind: its job
-(§5.1, backing `quarantine` in `prelude.ts`) is to run a sub-program against a
-conversation the caller is walled off from, not to check a flow condition on
-shared state.
+\texttt{endorse} (§E.2/§E.3) needs to decompose a label into its integrity and
+confidentiality components, which only a \texttt{FactoredLattice<L,I,S>} (not
+every \texttt{Lattice<L>}) can do. Some \texttt{Model<L>} instances (e.g.\ ones
+built around a lattice that never needs \texttt{endorse}) only implement the
+plain \texttt{Lattice<L>} interface. The two options were: require every
+\texttt{Model<L>} to supply a \texttt{FactoredLattice}, even when unused, or
+let \texttt{Model<L>.lattice} be a plain \texttt{Lattice<L>} and treat the
+extra factoring capability as something checked when \texttt{endorse} is
+actually reached.
 
-\emph{Decision}: `fork` doesn't gate the conversation at all. `expr.body`
-evaluates against a *copy* of `conv`; anything that body does — including its
-own `send`/`recv`/`clear` calls — is invisible to the caller, who gets back the
-original, pre-fork `conv` unchanged. `quarantine` is implemented entirely as
-"run untrusted code inside a `fork`" — there is no separate sandboxing
+\emph{Decision}: \texttt{Model<L>.lattice} is typed as \texttt{Lattice<L>}.
+\texttt{endorse} requires it to also implement \texttt{FactoredLattice};
+\texttt{evaluator.ts}'s \texttt{asFactoredLattice} does a runtime capability
+check (testing for \texttt{toIntegrity}/
+\texttt{toConfidentiality}/\texttt{pair}) and throws \texttt{RuntimeError} if
+it is missing, rather than the type system statically forbidding
+\texttt{endorse} on a non-factored model.
+
+
+\subsubsection{ADR-6: Default \texttt{parse}/\texttt{serialise} is naive JSON}
+
+Every \texttt{send}/\texttt{recv} crosses the
+\texttt{Expr}$\leftrightarrow$string boundary through
+\texttt{Model.parse}/\texttt{Model.serialise}. The paper's §7.3 flags that a
+production deployment needs a grammar-constrained parser --- one that can only
+ever produce a well-formed \texttt{Expr}, closing off a class of oracle-side
+attacks where a malicious or malfunctioning LLM response parses into something
+unintended.  Building that parser is real, nontrivial work orthogonal to what
+this port exists to demonstrate (the evaluation semantics).
+
+\emph{Decision}: Ship \texttt{defaultParse}/\texttt{defaultSerialise} as
+\texttt{JSON.parse}/\texttt{JSON.stringify} wrapped in a try/catch, and
+document --- in \texttt{README.md}'s design-choices list, \texttt{CLAUDE.md},
+and here --- that this is a known, deliberate gap (Article 4), not a claim that
+this is production-ready parsing.
+
+
+\subsubsection{ADR-7: \texttt{fork} snapshots the conversation instead of
+gating access to it}
+
+\texttt{send}, \texttt{recv}, and \texttt{clear} all gate access to
+\texttt{LabeledConversation<L>} by checking \texttt{flowsTo(pc, conv.label)}
+before touching it, then updating \texttt{conv.label} to reflect the new taint.
+\texttt{fork} is different in kind: its job (§5.1, backing \texttt{quarantine}
+in \texttt{prelude.ts}) is to run a sub-program against a conversation the
+caller is walled off from, not to check a flow condition on shared state.
+
+\emph{Decision}: \texttt{fork} does not gate the conversation at all.
+\texttt{expr.body} evaluates against a \emph{copy} of \texttt{conv}; anything
+that body does --- including its own \texttt{send}/\texttt{recv}/\texttt{clear}
+calls --- is invisible to the caller, who gets back the original, pre-fork
+\texttt{conv} unchanged. \texttt{quarantine} is implemented entirely as ``run
+untrusted code inside a \texttt{fork}'' --- there is no separate sandboxing
 mechanism.
-
-\subsection{The module map}
-
-\begin{tabular}{@{}ll@{}}
-\toprule
-File & Role \\
-\midrule
-\texttt{ast.ts} & Expr/Value AST and builder functions \\
-\texttt{lattice.ts} & \texttt{Lattice<L>}/\texttt{FactoredLattice} plus concrete instances \\
-\texttt{model.ts} & parse/serialise/primEval/toLabel --- the policy boundary \\
-\texttt{oracle.ts} & the pluggable, injectable source of nondeterminism \\
-\texttt{evaluator.ts} & the big-step semantics, rule by rule \\
-\texttt{prelude.ts} & \texttt{fix}/\texttt{quarantine}/\texttt{endorse} helpers as real object-language code \\
-\texttt{errors.ts} & \texttt{SecurityError} vs \texttt{RuntimeError} \\
-\bottomrule
-\end{tabular}
 
 \subsection{Environments, not substitution --- and the bug that came from that}
 \label{sec:env-not-subst}
@@ -894,7 +891,7 @@ development is entitled to make.
 
 \subsection{Future Work}
 
-Here are some future work to 
+Here are some future work to bullet proof the implementation:
 
 \begin{description}
   \item[A conformance-vector harness.] Diff this interpreter's output
@@ -944,6 +941,26 @@ Here are some future work to
   \item Sabelfeld \& Myers, \emph{Language-Based Information-Flow
     Security}, IEEE Journal on Selected Areas in Communications, 2003.
 \end{itemize}
+
+% ---------------------------------------------------------------------
+\subsection{Appendix A: File Structure}
+% ---------------------------------------------------------------------
+
+The code is structured as follows:
+
+\begin{tabular}{@{}ll@{}}
+\toprule
+File & Role \\
+\midrule
+\texttt{ast.ts} & Expr/Value AST and builder functions \\
+\texttt{lattice.ts} & \texttt{Lattice<L>}/\texttt{FactoredLattice} plus concrete instances \\
+\texttt{model.ts} & parse/serialise/primEval/toLabel --- the policy boundary \\
+\texttt{oracle.ts} & the pluggable, injectable source of nondeterminism \\
+\texttt{evaluator.ts} & the big-step semantics, rule by rule \\
+\texttt{prelude.ts} & \texttt{fix}/\texttt{quarantine}/\texttt{endorse} helpers as real object-language code \\
+\texttt{errors.ts} & \texttt{SecurityError} vs \texttt{RuntimeError} \\
+\bottomrule
+\end{tabular}
 
 % ---------------------------------------------------------------------
 \begin{thebibliography}{9}
