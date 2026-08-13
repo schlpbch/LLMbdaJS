@@ -1,4 +1,4 @@
-\documentclass[11pt, a4paper]{article}
+\documentclass[10pt, a4paper]{article}
 
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
@@ -6,7 +6,6 @@
 \usepackage{palatino}
 \usepackage{microtype}
 \usepackage{geometry}
-\geometry{margin=2.5cm}
 \usepackage{mathpartir}
 \usepackage{amsmath,amssymb}
 \usepackage{listings}
@@ -16,6 +15,8 @@
 \usepackage{parskip}
 \usepackage[hidelinks]{hyperref}
 \usepackage{cleveref}
+\usepackage{xspace}
+\usepackage{fullpage}
 
 \definecolor{codebg}{RGB}{237,237,233}
 \definecolor{codeaccent}{RGB}{47,111,94}
@@ -52,10 +53,14 @@
 \newcommand{\flowsto}{\sqsubseteq}
 \newcommand{\joinop}{\sqcup}
 
-\title{The LLMbda Calculus: Information Flow Control for LLM Agent
-Programs\\[0.3em]\large Concepts and a TypeScript Reference Implementation}
-\author{Andreas Schlapbach
-  \email{schlpbch@gmail.com}
+\newcommand{\LLMbda}{\textsc{LLMbda}\xspace}
+\newcommand{\CaMeL}{\textsc{CaMeL}\xspace}
+\newcommand{\FIDES}{\textsc{FIDES}\xspace}
+
+
+\title{The \LLMbda Calculus: Information Flow Control for LLM Agent
+Programs: A TypeScript Reference Implementation}
+\author{Andreas Schlapbach \email{schlpbch@gmail.com}
 }
 \date{}
 
@@ -64,20 +69,23 @@ Programs\\[0.3em]\large Concepts and a TypeScript Reference Implementation}
 \maketitle
 
 \begin{abstract}
-Giving a large language model access to tools --- reading email, browsing
-the web, writing files --- turns it into a program whose control flow is
-steered by whatever text it most recently read. This report introduces
-the \emph{LLMbda calculus} of Garby, Gordon \& Sands
-(\href{https://arxiv.org/abs/2602.20064}{arXiv:2602.20064}): a labeled,
-dynamically information-flow-tracked lambda calculus extended with
-first-class conversation primitives (\lstinline{send}, \lstinline{recv},
-\lstinline{fork}, \lstinline{clear}) for exactly this setting. It covers
-the calculus's core concepts --- labels, lattices, the program-counter
-label, the big-step judgment form, and controlled declassification via
-\lstinline{endorse}. Then it describes a TypeScript reference
-implementation of it, the specific implementation choices that
-implementation made, and what the port does and does not establish. Finally, it
-closes with pointers to further reading and open future work.
+
+Giving a large language model access to tools like reading email, browsing the
+	web or  writing files turns it into a program whose control flow is
+	steered by whatever text it most recently read. This report introduces
+	the \emph{LLMbda calculus} of Garby, Gordon \& Sands:
+	: a labeled,
+	dynamically information-flow-tracked lambda calculus extended with
+	first-class conversation primitives (\lstinline{send},
+	\lstinline{recv}, \lstinline{fork}, \lstinline{clear}) for exactly this
+	setting. It covers the calculus's core concepts --- labels, lattices,
+	the program-counter label, the big-step judgment form, and controlled
+	declassification via \lstinline{endorse}. Then it describes a
+	TypeScript reference implementation, the specific implementation
+	choices that implementation made, and what the port does and does not
+	establish. Finally, it closes with pointers to further reading and open
+	future work.
+
 \end{abstract}
 
 
@@ -107,7 +115,7 @@ Permissions are typically checked once, at the API boundary. What is
 missing is tracking \emph{where a piece of data has been} as it moves
 through the program.
 
-Two shapes of failure of failure are common in this setting:
+Two shapes of failure are common in this setting:
 
 \begin{description}
   \item[Exfiltration.] A program with access to secret data and an output
@@ -127,59 +135,52 @@ value in the program carries a \emph{label} describing its provenance and trust
 level, and every operation that moves data --- assignment, output, a tool call
 --- is checked against those labels before it is allowed to happen. 
 
-The LLMbda calculus applies this idea to a lambda calculus extended with the
+The \LLMbda calculus applies this idea to a lambda calculus extended with the
 primitives an LLM agent actually needs.
 
 % ---------------------------------------------------------------------
 \section{Foundations}
 % ---------------------------------------------------------------------
 
-\subsection{LLMbda in one paragraph}
+\subsection{\LLMbda in One Paragraph}
 
-LLMbda is a labeled, dynamically information-flow-tracked lambda calculus,
+\LLMbda is a labeled, dynamically information-flow-tracked lambda calculus,
 extended with conversation primitives, defined by a big-step operational
-semantics~\cite{llmbda}.
+semantics~\cite{llmbda}. Every value carries a security label from a security
+lattice. Labels are computed at runtime as values flow through
+the program, not inferred statically ahead of time.  Conversation primitives as
+\lstinline{send}/\lstinline{recv}/ \lstinline{fork}/\lstinline{clear} are
+first-class syntax, so talking to a model is part of the calculus, not a side
+effect bolted on afterward.
 
-\begin{descirption}
- \item[Labeled] Every value carries a security label from a security
-    lattice, not just a type.
-  \item[Dynamically tracked] Labels are computed at runtime as
-    values flow through the program, not inferred statically ahead of
-    time.
-  \item[{Conversation primitivesr] \lstinline{send}/\lstinline{recv}/
-    \lstinline{fork}/\lstinline{clear} are first-class syntax, so talking
-    to a model is part of the calculus, not a side effect bolted on
-    afterward.
 \end{description}
 
-\subsection{What a label actually is}
+\subsection{What a Label Actually Is}
 
-A label is a fact about provenance and trust --- not a permission, and not
-a type. Take the simplest useful label set, $\{U, S\}$ for
-\emph{Untrusted} and \emph{Secret}: a value read from a public web page
-might be labeled $\{U\}$; a value read from a private calendar might be
-labeled $\{S\}$; a value built by combining both is labeled $\{U, S\}$ ---
-it inherits every source it touched. The reference implementation's
-\texttt{lattice.ts} implements exactly this as a $\{U,S\}$-powerset
-lattice, plus a richer CaMeL-style Sources$\times$Readers lattice
-capturing per-reader confidentiality.
+A label is a fact about provenance and trust. Thus, a label is neither a
+permission nor a type. Take the simplest useful label set, $\{U, S\}$ for
+\emph{Untrusted} and \emph{Secret}: a value read from a public web page might
+be labeled $\{U\}$; a value read from a private calendar might be labeled
+$\{S\}$; a value built by combining both is labeled $\{U, S\}$ --- it inherits
+every source it touched. The reference implementation's \texttt{lattice.ts}
+implements exactly this as a $\{U,S\}$-powerset lattice, plus a richer
+\CaMeL-style Sources$\times$Readers lattice capturing per-reader
+confidentiality.
 
-\subsection{The lattice: what makes labels combinable}
+\subsection{The Lattice: What Makes Labels Combinable}
 
-Labels need an algebra, not just a set --- one must be able to ask ``does
+Labels need an algebra, not just a set as one must be able to ask ``does
 information flow from label $a$ to label $b$?''
 
-\begin{center}
-	\begin{tabular}{lll}
-	\toprule
-	Operation & Meaning \\
-	\midrule
-	$a \flowsto b$ & Partial Order / Relation & \textbf{Flow Permission:} is it safe for data labeled $a$ to influence something labeled $b$? \\
-	$a \joinop b$ & Join / Least Upper Bound (LUB) & \textbf{Label Aggregation:} the label of a value built from both an $a$- and a $b$-labeled input (LUB) \\
-	$\bot$ & Bottom / Least Element & \textbf{Public Data} The lowest security clearance (e.g. completely public info) \\
-	\bottomrule
-	\end{tabular}
-\end{center}
+\begin{tabular}{lll@{4cm}}
+\toprule
+Operation & Meaning & Description \\
+\midrule
+$a \flowsto b$ & Partial Order / Relation & \textbf{Flow Permission:} denotes whether it is safe for data labeled $a$ to influence something labeled $b$ \\
+$a \joinop b$ & Join / Least Upper Bound (LUB) & \textbf{Label Aggregation:} the label of a value built from both an $a$- and a $b$-labeled input (LUB) \\
+$\bot$ & Bottom / Least Element & \textbf{Public Data} The lowest security clearance (e.g. completely public info) \\
+\bottomrule
+\end{tabular}
 
 Any lattice instance must satisfy: reflexivity, transitivity, and
 antisymmetry of $\flowsto$; and $\joinop$ must be a genuine least upper
@@ -200,9 +201,8 @@ executing this code path is. Branching on a secret raises $pc$ for the
 branch bodies; anything written under a raised $pc$ inherits that taint,
 whether or not it looks like it touched the secret directly.
 
-\subsection{Syntax, at a glance}
+\subsection{Syntax of the \LLMbda}
 
-\begin{center}
 \begin{tabular}{@{}ll@{}}
 \toprule
 Form & Role \\
@@ -216,9 +216,8 @@ $e_1 \mathbin{?} e_2$, $\mathtt{assert}\ e$ & runtime checks against the current
 \texttt{endorse} & controlled, audited relabeling --- declassification \\
 \bottomrule
 \end{tabular}
-\end{center}
 
-\subsection{The judgment form}
+\subsection{The Judgment Form}
 
 Every evaluation step is stated as one judgment, threading four things
 through the program:
@@ -228,11 +227,11 @@ pc \vdash \mathit{conv}, e \;\bigstep\; \mathit{conv}', v
 \]
 
 \begin{itemize}
-  \item $pc$ --- the ambient label context this step runs under;
-  \item $\mathit{conv}$ --- the conversation (message history plus its own
+  \item $pc$: the ambient label context this step runs under;
+  \item $\mathit{conv}$: the conversation (message history plus its own
     label) coming in;
-  \item $e$ --- the expression being evaluated;
-  \item $\mathit{conv}', v$ --- the possibly-updated conversation and the
+  \item $e$: the expression being evaluated;
+  \item $\mathit{conv}', v$: the possibly-updated conversation and the
     resulting labeled value.
 \end{itemize}
 
@@ -242,11 +241,11 @@ subexpressions.
 
 \subsection{The core rules look like ordinary lambda calculus}
 
-Application evaluates the function, then the argument, then substitutes
---- the same shape as ordinary lambda calculus, just carrying $pc$ and
-$\mathit{conv}$ along for the ride.
+Simlar as in ordinary lambda caluculus an application evaluates the function,
+then the argument, then substitutes while carrying $pc$ and $\mathit{conv}$
+along for the ride.
 
-\begin{center}
+
 \begin{tabular}{@{}ll@{}}
 \toprule
 Rule & What happens \\
@@ -256,7 +255,6 @@ Rule & What happens \\
 \texttt{app} & evaluate $e_1$, then $e_2$ (threading $\mathit{conv}$), then apply \\
 \bottomrule
 \end{tabular}
-\end{center}
 
 \emph{This is a simplified sketch for exposition, not the literal paper
 grammar} --- see \texttt{evaluator.ts} for the rule-by-rule
@@ -279,7 +277,7 @@ tainted as $l$. It is the explicit half of label propagation; the
 implicit half happens automatically every time a rule joins in the labels
 of whatever it read.
 
-\subsection{Runtime checks: \texttt{assert} and \texorpdfstring{$e_1\mathbin{?}e_2$}{e1 ? e2}}
+\subsection{Runtime Checks: \texttt{assert} and \texorpdfstring{$e_1\mathbin{?}e_2$}{e1 ? e2}}
 
 Labels are dynamic, so ``is this flow allowed?'' is a question the
 interpreter can only answer as it runs, not ahead of time.
@@ -298,23 +296,24 @@ This is the difference between IFC done as a static type system
 dynamically, as here: no program is rejected before it runs, but a
 violation is caught the moment it would actually occur.
 
-\subsection{Every value carries a label --- everywhere}
+\subsection{Every Value Always Carries a Label}
 
-Not just top-level results: record fields, array elements, function
-closures each have their own label. This matters more than it might
-appear to. If reading a field out of a record simply returned the value
-as stored, without re-checking the current $pc$, a value could pass
-through a tainted context and come out looking untouched on the other
-side. Getting this right for every place a value is \emph{read back out}
-of something --- not just where it is first produced --- turns out to be
-the single easiest place for an implementation to go quietly wrong; see
+Every value and not just top-level results carry a label. E.g., record fields,
+array elements, function closures each have their own label. This matters more
+than it might appear to. If reading a field out of a record simply returned the
+value as stored, without re-checking the current $pc$, a value could pass
+through a tainted context and come out looking untouched on the other side.
+
+Getting this right for every place a value is \emph{read back out} of something
+and not just where it is first produced turns out to be the single easiest
+place for an implementation to go quietly wrong; see
 Section~\ref{sec:env-not-subst}.
 
 % ---------------------------------------------------------------------
 \section{Conversations and the Oracle}
 % ---------------------------------------------------------------------
 
-\subsection{Conversations are first-class values}
+\subsection{Conversations are First-Class Values}
 
 This is the calculus's real novelty over classical IFC: a conversation
 with a model is not a side channel outside the label system --- it is a
@@ -334,9 +333,10 @@ Before a value can be appended to a conversation's history, the current
 $pc$ joined with the value's own label must flow to the conversation's
 label. If it does not --- if the program is trying to send something more
 sensitive than the conversation is cleared for --- the send is rejected.
-This is the rule that closes the paper's Fenton/Denning-style
-exfiltration gadget: a secret cannot smuggle itself out through what looks
-like an ordinary model call.
+
+This is the rule that closes the paper's Fenton/Denning-style exfiltration
+gadget: a secret cannot smuggle itself out through what looks like an ordinary
+model call.
 
 \subsection{\texttt{recv} --- the response inherits the conversation's taint}
 
@@ -348,9 +348,10 @@ Whatever comes back from the model is parsed into code, and that code
 runs with $pc$ set to the conversation's own label --- \emph{not} the
 caller's $pc$. A response that came out of an untrusted conversation is
 automatically treated as untrusted, no matter how innocuous it looks
-syntactically. This closes the confinement failure from
-Section~\ref{sec:failures}: generated code inherits exactly the trust
-level of where it came from.
+syntactically. 
+
+This closes the confinement failure from Section~\ref{sec:failures}: generated
+code inherits exactly the trust level of where it came from.
 
 \subsection{\texttt{fork} --- isolation by snapshot, not by gate}
 
@@ -372,7 +373,7 @@ keeping the old, lower label would let a program launder a tainted
 conversation back down to a trust level it no longer deserves --- clearing
 can only lower the bar as far as the current context actually justifies.
 
-\subsection{The oracle: where the one impure thing lives}
+\subsection{The Oracle: Where the One Impure Thing Lives}
 
 An LLM call is nondeterministic. Everything else in the calculus is a
 pure function of its inputs. The calculus pushes that nondeterminism into
@@ -383,11 +384,11 @@ calls \lstinline{oracle.respond(history, callIndex)}, and only inside
 double, and the entire interpreter becomes unit-testable without touching
 a real model.
 
-\subsection{Confinement, stated precisely}
+\subsection{Precisely Stated Confinement}
 
-A property, not just an intuition: on the way out of \lstinline{recv},
-the produced value's label is always at least as high as the $pc$ it was
-evaluated under.
+Confinement is a property, not just an intuition: on the way out of
+\lstinline{recv}, the produced value's label is always at least as high as the
+$pc$ it was evaluated under.
 
 \[
 pc \flowsto \ell(V)
@@ -399,14 +400,16 @@ than a hope. It is also exactly the property that a naive
 environment-based implementation can accidentally violate --- see
 Section~\ref{sec:env-not-subst}.
 
-\subsection{Noninterference, informally}
+\subsection{Informal Noninterference}
 
-The property all of this machinery is in service of: take two runs of the
-same program that differ only in their secret inputs. Noninterference
-says that, to an observer who can only see values at or below some trust
-level, the two runs are indistinguishable --- nothing secret leaked into
-what that observer can tell, whether through data, control flow, or
-timing of visible effects. The paper states and machine-checks three
+The property all of this machinery is in service of: take two runs of the same
+program that differ only in their secret inputs. Noninterference says that, to
+an observer who can only see values at or below some trust level, the two runs
+are indistinguishable. Which means that nothing secret leaked into what that
+observer can tell, whether through data, control flow, or timing of visible
+effects. 
+
+The paper states and machine-checks three
 versions of this for the calculus --- TIPNI, Insulated TIPNI, and
 oracular correctness --- in Lean~4. What that does and does not mean for
 this TypeScript port is the subject of Section~\ref{sec:limits}.
@@ -415,17 +418,17 @@ this TypeScript port is the subject of Section~\ref{sec:limits}.
 \section{Declassification}
 % ---------------------------------------------------------------------
 
-\subsection{Why you need a way out}
+\subsection{Why you Need a Way Out of Strict Non-Interference}
 \label{sec:failures}
 
-Strict noninterference is too strong for anything useful --- sometimes
+Strict noninterference is too strong for anything useful as sometimes
 crossing a label boundary is exactly the point. An agent reads a private
 document and is asked to produce a one-paragraph summary to share with a
 colleague. That summary is, by construction, derived from secret input
 --- but it is also the deliberate output of the task. Refusing to ever let
 anything derived from a secret flow anywhere less secret makes the
 calculus useless for the actual job. A controlled, explicit exception is
-needed: \emph{declassification}.
+needed which we denote as \emph{declassification}.
 
 \subsection{\texttt{endorse} --- splitting the label in two}
 
@@ -473,7 +476,6 @@ the fork.
 
 Stepping back, the conversation rules all follow the same pattern:
 
-\begin{center}
 \begin{tabular}{@{}ll@{}}
 \toprule
 Rule & Check, then update \\
@@ -484,7 +486,6 @@ Rule & Check, then update \\
 \texttt{fork} & no gate --- snapshot instead, isolating rather than checking \\
 \bottomrule
 \end{tabular}
-\end{center}
 
 \lstinline{endorse} is the deliberate exception to ``labels only ever go
 up'': a named, audited place where a program can ask for less.
@@ -494,45 +495,45 @@ up'': a named, audited place where a program can ask for less.
 \label{sec:related-work}
 % ---------------------------------------------------------------------
 
-LLMbda is one of several provenance-based defences against prompt
+\LLMbda is one of several provenance-based defences against prompt
 injection published within roughly eighteen months of one another, all
 responding to the same problem: an agent cannot tell untrusted data
 apart from a privileged instruction once both are just text in a
 context window. This section places the calculus against the four
 closest of them.
 
-\subsection{CaMeL: dual-LLM plus capability tracking}
+\subsection{\CaMeL: dual-LLM plus capability tracking}
 
-CaMeL~\cite{camel} (Google, Google DeepMind, ETH~Z\"urich) pairs a
+\CaMeL~\cite{camel} (Google, Google DeepMind, ETH~Z\"urich) pairs a
 privileged planner model, which never reads untrusted data directly,
 with a quarantined model that reads it but can only return values ---
-the dual-LLM pattern LLMbda's \lstinline{fork}/\lstinline{quarantine}
+the dual-LLM pattern  \LLMbda's \lstinline{fork}/\lstinline{quarantine}
 can express as one policy among others rather than a fixed
-architecture. CaMeL has a public reference implementation and reports
+architecture. \CaMeL has a public reference implementation and reports
 near-complete attack resistance with its policy checks on, but the
-original LLMbda paper reproduces two concrete gaps in CaMeL's own
+original  \LLMbda paper reproduces two concrete gaps in \CaMeL's own
 tracker: a classic Fenton--Denning implicit-flow gadget (a
 secret-dependent branch that updates a variable only on the branch it
 does \emph{not} take, which a purely dynamic monitor cannot taint), and
 an untracked Python retry loop that leaks one bit of a secret per
-iteration, launderable in full by an adaptive attacker. Turning CaMeL's
+iteration, launderable in full by an adaptive attacker. Turning \CaMeL's
 policy checks on also costs roughly half its task-completion rate on
 the shared AgentDojo~\cite{agentdojo} banking suite (66.7\%
-$\rightarrow$ 37.5\% in the LLMbda paper's reruns) --- the
-utility/security trade-off LLMbda's own benchmark is designed to close.
+$\rightarrow$ 37.5\% in the  \LLMbda paper's reruns) --- the
+utility/security trade-off  \LLMbda's own benchmark is designed to close.
 
-\subsection{FIDES: dynamic taint tracking without control-flow secrecy}
+\subsection{\FIDES: dynamic taint tracking without control-flow secrecy}
 
-FIDES~\cite{fides} (Microsoft Research) tracks confidentiality and
+\FIDES~\cite{fides} (Microsoft Research) tracks confidentiality and
 integrity dynamically through a parametric planner loop, closer in
-spirit to LLMbda's per-value labels than CaMeL's architecture is. Its
+spirit to  \LLMbda's per-value labels than \CaMeL's architecture is. Its
 confidentiality guarantee is, by the authors' own design, incomplete:
 it does not track secrets carried through data-dependent control flow,
 and it admits a bounded ``small-domain values are safe'' escape hatch.
 Both choices are defensible engineering trade-offs, but neither is
 auditable from a single run --- there is no way to tell, after the
 fact, whether an admitted value was an intended downgrade or a leak
-wearing the same clothes. \lstinline{endorse} is LLMbda's answer to
+wearing the same clothes. \lstinline{endorse} is  \LLMbda's answer to
 exactly this: a downgrade is only ever explicit, and Insulated TIPNI
 (Section~\ref{sec:failures}) proves it cannot smuggle a change along an
 axis the call did not name.
@@ -546,31 +547,30 @@ Diego) type-checks agent-generated code against a Haskell
 tracks capabilities through Scala~3's capture-checking type system.
 Neither has a noninterference-style proof for the composed,
 agent-generated application as a whole, and both show the same
-utility/security collapse pattern as CaMeL when enforcement is on (e.g.
+utility/security collapse pattern as \CaMeL when enforcement is on (e.g.
 TypeGuard's reported 15/21 $\rightarrow$ 8/21 on a Slack-flavoured
-AgentDojo suite). They are not directly substitutable for LLMbda's
+AgentDojo suite). They are not directly substitutable for  \LLMbda's
 dynamic guarantee, though the original paper conjectures the two
 disciplines are complementary: static enforcement pre-execution, and a
-noninterference guarantee such as LLMbda's for whatever dynamic
+noninterference guarantee such as  \LLMbda's for whatever dynamic
 behaviour a static check cannot rule out ahead of time.
 
-\subsection{Where LLMbda differs}
+\subsection{Where  \LLMbda differs}
 
-\begin{center}
 \small
-\begin{tabular}{@{}p{2.6cm}p{3.1cm}p{3.4cm}p{4.2cm}@{}}
+\begin{tabular}{@{}p{2.2cm}p{3.8cm}p{3.8cm}p{4.7cm}@{}}
 \toprule
 System & Core discipline & Soundness proof & Known/demonstrated gap \\
 \midrule
-LLMbda & Dynamic IFC, first-class conversation primitives &
+ \LLMbda & Dynamic IFC, first-class conversation primitives &
 Machine-checked in Lean~4 (TIPNI, Insulated TIPNI, oracular
 correctness) & \lstinline{endorse} escape hatch; external tool I/O not
 yet modelled \\
-CaMeL~\cite{camel} & Dual-LLM + capability-based control/data-flow
+\CaMeL~\cite{camel} & Dual-LLM + capability-based control/data-flow
 extraction & None stated; authors call formalisation ``a crucial
 direction'' for future work & Untaken-branch implicit flow;
 untracked retry-loop bit leak \\
-FIDES~\cite{fides} & Dynamic taint tracking (confidentiality $+$
+\FIDES~\cite{fides} & Dynamic taint tracking (confidentiality $+$
 integrity) & Formal model for the planner class; confidentiality
 guarantee deliberately incomplete & Ignores control-flow-carried
 secrets by design \\
@@ -584,48 +584,193 @@ proof) & Integrity/capability-flavoured; not a confidentiality
 guarantee \\
 \bottomrule
 \end{tabular}
-\end{center}
 
-The comparison is not a claim that LLMbda is unconditionally better ---
-CaMeL and FIDES both have public reference implementations backed by
-production organisations today, while the LLMbda paper's own Lean~4
+The comparison is not a claim that  \LLMbda is unconditionally better ---
+\CaMeL and \FIDES both have public reference implementations backed by
+production organisations today, while the  \LLMbda paper's own Lean~4
 artifact is, at the time of writing, available from the authors rather
 than publicly released (a gap this TypeScript port exists precisely to
-partially work around, without inheriting the proof). The distinguishing
-claim is narrower and more specific: LLMbda is the only one of the five
-with an end-to-end machine-checked soundness proof for the whole
-composed system, including agent-generated code, and it reports the best
+partially work around, without inheriting the proof).
+
+The distinguishing of  \LLMbda claim is narrower and more specific: It is the
+only one of the five with an end-to-end machine-checked soundness proof for the
+whole composed system, including agent-generated code, and it reports the best
 published utility/security trade-off of the group on a shared benchmark.
 
 % ---------------------------------------------------------------------
-\section{Inside This Port}
+\section{The Port to TypeScript}
 % ---------------------------------------------------------------------
 
-\subsection{Architecture, at the top level}
+\subsection{Top Level Architecture}
 
 A caller assembles two things and gets a pure function:
 
 \begin{lstlisting}
-Model<L>              Oracle
-(parse/serialise/     (respond:
- primEval/toLabel)    history -> string)
-        \                /
-         \              /
-     evaluate(model, oracle, run,
-              pc, conv, expr, env)
-                 |
-                 v
-       EvalResult<L> = { conv, value }
+Model<L>                               Oracle
+(parse/serialise/primEval/toLabel)     (respond: history-> string)        
+                \                         /
+                 \                       /
+     evaluate(model, oracle, run, pc, conv, expr, env)
+                                |
+                                v
+                  EvalResult<L> = { conv, value }
 \end{lstlisting}
 
-\lstinline{Model<L>} supplies the policy --- what labels look like, how to
-parse/serialise across the model boundary, what primitives exist.
-\lstinline{Oracle} supplies the one impure thing. \lstinline{evaluate} is
-otherwise a pure recursive function.
+where
+
+\begin{itemize}
+  \item{\lstinline{Model<L>} supplies the policy --- what labels look like, how to
+	  parse/serialise across the model boundary, what primitives exist.}
+  \item{\lstinline{Oracle} supplies the one impure thing. \lstinline{evaluate} is
+	  otherwise a pure recursive function.}
+\end{itemize}
+
+\subsection{Design Decisions}
+
+
+\subsubsection{ADR-1: Environments implement substitution semantics, with explicit `pc` re-join on reads}
+
+The paper's big-step semantics (§3/§5/§B) is defined over **substitution**
+(`e[x := e′]`): a variable occurrence is *replaced* by the value it's bound to,
+so re-encountering that value under a subsequently-raised `pc` implicitly
+taints it via `⇓-Labelled`/`⇓-Lam`.  This port uses environments (name → value
+maps) instead, which is the standard practical technique for implementing a
+substitution calculus — substitution itself is not something you want to
+actually perform on every function application.
+
+The catch: a naive environment lookup (`var`, record `.field` access) just
+returns whatever value was stored at bind time, unchanged. Under substitution
+semantics, a value read out from inside a `pc`-raised context is retroactively
+part of that context and picks up its taint; under naive environment lookup, it
+silently doesn't. This gap was found in `var`/`field` (`⇓-ArrayIndex` already
+did it correctly), fixed, and then found again independently in further spots
+across three rounds of a rule-by-rule audit — see `evaluator.ts`/`lattice.ts`
+git history and `examples/var-pc-confinement.ts`.
+
+\emph{Decision}: Keep the environment-based implementation (rewriting to a
+substitution interpreter would be a much larger, higher-risk change for no
+semantic benefit), but treat "does this case need to re-join the ambient `pc`
+into the returned value's label" as a mandatory question for every case that
+*reads* a value out of an existing structure — environment, record, array —
+rather than constructing one fresh. This is now a standing check called out in
+`CLAUDE.md` for anyone adding a new evaluation rule.
+
+
+\subsubsection{ADR-2: Prelude functions are object-language closures, not host
+TS functions}
+
+`fix`, `quarantine`, `robust_endorse`, and `bounded_endorse` (§C.5, §5.1, §E.2,
+§E.3) need to be callable from code the interpreter did not write — strings an
+LLM returns via `recv`, parsed by `Model.parse` into an `Expr`. Parsed code can
+only reference names bound in *that `Expr`'s environment*; it has no way to
+reach an arbitrary host-language (TS) function, no matter how it's registered.
+
+`bounded_endorse` has an additional constraint: per §E.3, its trust domain must
+be a fixed, static list baked in at construction time — a runtime-computed
+domain would forfeit the paper's log₂n leakage bound.  That rules out
+implementing it as a single reusable `Expr` the way
+`fix`/`quarantine`/`robust_endorse` are.
+
+\emph{Decision:} Define `fix`, `quarantine`, and `robust_endorse` in
+`prelude.ts` as `Expr` values built from the same AST constructors used
+everywhere else (`ast.ts`), exposed as a name→`Expr` map via
+`Model.preludeSource`, and merged into scope for both the top-level program and
+every parsed `recv` response (mirroring §3.3's `M.preludeEnv`). Define
+`bounded_endorse` as a *builder function* that takes the static trust domain at
+construction time and returns an `Expr`, rather than as a single fixed prelude
+entry.
+
+
+\subsubsection{ADR-3: No `weight`/probability tracking and no "fuel" argument}
+
+
+The paper's Lean 4 development carries a `weight`/probability parameter through
+its big-step judgment (needed for its probabilistic semantics and the
+machine-checked noninterference proofs) and a "fuel" argument (a standard
+technique to make an otherwise-partial evaluation function total for Lean's
+termination checker). Neither is part of what the calculus *computes* — both
+are proof-engineering artifacts of doing the semantics in a proof assistant.
+
+\emph{Decision}: Omit both from this port. `evaluate` is an ordinary (possibly
+non-terminating, like any interpreter) TypeScript function; it doesn't track a
+weight and doesn't take or decrement a fuel parameter.
+
+
+\subsubsection{ADR-4: Labels are homogeneous per run; `BareValue` stores
+`Labeled<unknown>`}
+
+`evaluate` is generic over the label type `L` (`Lattice<L>`/ `Model<L>`), but
+composite runtime values — record fields, array elements — need to store
+labeled sub-values too. Threading `L` through `BareValue` generically
+(`Labeled<L>` everywhere a labeled value can appear, recursively) would work,
+but it means every data-shape type in `ast.ts` becomes generic in `L`, for a
+distinction that is never actually exercised: a single `evaluate()` call always
+closes over exactly one concrete `Model<L>`, so every label a given run ever
+produces already has the same concrete `L`.
+
+\emph{Decision}: `BareValue`'s record/array fields store `Labeled<unknown>`
+rather than `Labeled<L>`. Soundness of treating those `unknown` labels as the
+run's actual `L` comes from a single `asL<L>()` cast at the point in
+`evaluator.ts` where it matters, rather than from the type system proving it
+structurally throughout `ast.ts`.
+
+
+\subsubsection{ADR-5: `endorse`'s `FactoredLattice` requirement is a runtime
+check, not a type constraint}
+
+`endorse` (§E.2/§E.3) needs to decompose a label into its integrity and
+confidentiality components, which only a `FactoredLattice<L,I,S>` (not every
+`Lattice<L>`) can do. Some `Model<L>` instances (e.g. ones built around a
+lattice that never needs `endorse`) only implement the plain `Lattice<L>`
+interface. The two options were: require every `Model<L>` to supply a
+`FactoredLattice`, even when unused, or let `Model<L>.lattice` be a plain
+`Lattice<L>` and treat the extra factoring capability as something checked when
+`endorse` is actually reached.
+
+\emph{Decision}: `Model<L>.lattice` is typed as `Lattice<L>`. `endorse`
+requires it to also implement `FactoredLattice`; `evaluator.ts`'s
+`asFactoredLattice` does a runtime capability check (testing for `toIntegrity`/
+`toConfidentiality`/`pair`) and throws `RuntimeError` if it's missing, rather
+than the type system statically forbidding `endorse` on a non-factored model.
+
+
+\subsubsection{ADR-6: Default `parse`/`serialise` is naive JSON, not a
+grammar-constrained parser}
+
+Every `send`/`recv` crosses the `Expr`↔string boundary through
+`Model.parse`/`Model.serialise`. The paper's §7.3 flags that a production
+deployment needs a grammar-constrained parser — one that can only ever produce
+a well-formed `Expr`, closing off a class of oracle-side attacks where a
+malicious or malfunctioning LLM response parses into something unintended.
+Building that parser is real, nontrivial work orthogonal to what this port
+exists to demonstrate (the evaluation semantics).
+
+\emph{Decision}: Ship `defaultParse`/`defaultSerialise` as
+`JSON.parse`/`JSON.stringify` wrapped in a try/catch, and document — in
+`README.md`'s design-choices list, `CLAUDE.md`, and here — that this is a
+known, deliberate gap (Article 4), not a claim that this is production-ready
+parsing.
+
+
+\subsubsection{ADR-7: `fork` snapshots the conversation instead of gating
+access to it}
+
+`send`, `recv`, and `clear` all gate access to `LabeledConversation<L>` by
+checking `flowsTo(pc, conv.label)` before touching it, then updating
+`conv.label` to reflect the new taint. `fork` is different in kind: its job
+(§5.1, backing `quarantine` in `prelude.ts`) is to run a sub-program against a
+conversation the caller is walled off from, not to check a flow condition on
+shared state.
+
+\emph{Decision}: `fork` doesn't gate the conversation at all. `expr.body`
+evaluates against a *copy* of `conv`; anything that body does — including its
+own `send`/`recv`/`clear` calls — is invisible to the caller, who gets back the
+original, pre-fork `conv` unchanged. `quarantine` is implemented entirely as
+"run untrusted code inside a `fork`" — there is no separate sandboxing
+mechanism.
 
 \subsection{The module map}
 
-\begin{center}
 \begin{tabular}{@{}ll@{}}
 \toprule
 File & Role \\
@@ -639,7 +784,6 @@ File & Role \\
 \texttt{errors.ts} & \texttt{SecurityError} vs \texttt{RuntimeError} \\
 \bottomrule
 \end{tabular}
-\end{center}
 
 \subsection{Environments, not substitution --- and the bug that came from that}
 \label{sec:env-not-subst}
@@ -649,26 +793,28 @@ port uses environments instead --- the standard practical technique ---
 with a consequence worth knowing. Under substitution, re-encountering a
 value inside a $pc$-raised context automatically taints it. Under a naive
 environment lookup, a stored value just comes back unchanged, silently
-dropping that taint. This exact gap was found and fixed in variable
-lookup and record field access, then found again, independently, in seven
-more places across three rounds of a rule-by-rule audit. Every
-environment/record/array read has to actively re-join the ambient label
---- it does not happen for free the way it does under substitution.
+dropping that taint. 
+
+This exact gap was found and fixed in variable lookup and record field access,
+then found again, independently, in seven more places across three rounds of a
+rule-by-rule audit. Every read has to actively re-join the ambient label --- it
+does not happen for free the way it does under substitution.
 
 \subsection{The prelude is object-language code, not TypeScript}
 
 \lstinline{quarantine}, \lstinline{robust_endorse}, and
 \lstinline{bounded_endorse} are built from the same AST constructors as
-everything else --- not as host TypeScript helper functions. The reason:
-code an LLM returns via \lstinline{recv} is \emph{parsed} into an
-\lstinline{Expr}, and parsed code can only call names bound in \emph{that
-expression's own environment}. A plain TypeScript function is not
-reachable from it at all, no matter how it is registered. So the prelude
-has to be written the same way any agent-callable code is --- as real
-\lstinline{Expr} values, evaluated once per run and merged into every
-scope, top-level and every parsed \lstinline{recv} response alike.
+everything else --- not as host TypeScript helper functions. 
 
-\subsection{One label type per run}
+The reason is that the code an LLM returns via \lstinline{recv} is
+\emph{parsed} into an \lstinline{Expr}, and parsed code can only call names
+bound in \emph{that expression's own environment}. A plain TypeScript function
+is not reachable from it at all, no matter how it is registered. So the prelude
+has to be written the same way any agent-callable code is --- as real
+\lstinline{Expr} values, evaluated once per run and merged into every scope,
+top-level and every parsed \lstinline{recv} response alike.
+
+\subsection{One Label Type Per Run}
 
 A small, deliberate type-system compromise: record and array values store
 their fields as \lstinline{Labeled<unknown>}, not \lstinline{Labeled<L>}
@@ -683,7 +829,7 @@ matters, rather than the type checker proving it structurally everywhere.
 The minimal end-to-end wiring, from \texttt{examples/postcode.ts}:
 
 \begin{lstlisting}
-const model = usModel();               // labels, parse/serialise, primEval
+const model = useModel();               // labels, parse/serialise, primEval
 const oracle = scriptedOracle([...]);   // deterministic canned responses
 
 const { value } = runProgram(
@@ -703,11 +849,13 @@ rejects the attack it is meant to. The example constructs the classic
 covert-channel gadget --- branch on a secret, take an action visible on an
 untrusted channel depending on which branch ran --- and asserts that the
 interpreter throws a \lstinline{SecurityError} rather than letting the
-send through. Because it is regression-tested against the pre-fix source
+send through.
+
+Because it is regression-tested against the pre-fix source
 too, it is not just ``this looks right'' --- it is confirmed to actually
 catch the bug it names.
 
-\subsection{Testing discipline}
+\subsection{Testing Discipline}
 
 Three rules, enforced in continuous integration:
 
@@ -734,30 +882,19 @@ three passes,'' not ``looked correct on first read.''
 
 \subsection{What this port does not prove}
 
-Say this precisely, because it is easy to blur: the paper's central
-results --- TIPNI, Insulated TIPNI, oracular correctness --- are
-machine-checked in the paper's own \textbf{Lean~4} development. Porting
-the algorithm to TypeScript does not port the proof. What this repository
-offers instead is the same evaluation rules, regression-tested against
-the paper's own worked examples, including its named leak gadgets.
-\textbf{``The interpreter rejects the leak''} is evidence.
+The paper's central results --- TIPNI, Insulated TIPNI, oracular correctness
+--- are machine-checked in the paper's own \textbf{Lean~4} development. Porting
+the algorithm to TypeScript does not port the proof. 
+
+What this repository offers instead is the same evaluation rules,
+regression-tested against the paper's own worked examples, including its named
+leak gadgets.  \textbf{``The interpreter rejects the leak''} is evidence.
 \textbf{``The interpreter is noninterferent''} is a claim only the Lean
 development is entitled to make.
 
-\subsection{Future work: proving more, not just building more}
+\subsection{Future Work}
 
-\begin{description}
-  \item[Property-based testing.] Use \texttt{fast-check} to generate
-    pairs of programs related by the paper's $\sim_m$ equivalence, and
-    check their traces stay compatible under a scripted oracle --- real
-    evidence, not a proof, but a good way to hunt for divergences
-    intuition alone will not find.
-  \item[A randori-style agent harness.] Practice against a mock world
-    state, then regenerate and run for real --- evidence the port is
-    usable for something, not just faithful to the semantics on paper.
-\end{description}
-
-\subsection{Future work: closing the gap to Lean}
+Here are some future work to 
 
 \begin{description}
   \item[A conformance-vector harness.] Diff this interpreter's output
@@ -765,6 +902,17 @@ development is entitled to make.
     \mathit{oracle}) \to (\mathit{conversation}, \mathit{value})$ triples.
     Given how many bugs hand-auditing already found, likely the
     highest-value item on this list.
+
+  \item[Property-based testing.] Use \texttt{fast-check} to generate
+    pairs of programs related by the paper's $\sim_m$ equivalence, and
+    check their traces stay compatible under a scripted oracle --- real
+    evidence, not a proof, but a good way to hunt for divergences
+    intuition alone will not find.
+
+  \item[A randori-style agent harness.] Practice against a mock world
+    state, then regenerate and run for real --- evidence the port is
+    usable for something, not just faithful to the semantics on paper.
+
   \item[A real oracle.] Only \lstinline{scriptedOracle}/\lstinline{ruleOracle}
     --- test doubles --- exist today. A production oracle backed by an
     actual LLM API is a thin adapter away, and would let the whole
@@ -772,10 +920,11 @@ development is entitled to make.
 \end{description}
 
 % ---------------------------------------------------------------------
-\section*{Further Reading}
+\subsection{Further Reading}
 % ---------------------------------------------------------------------
 
-\paragraph{The paper and this port.}
+\paragraph{On the \LLMbda Calculus}
+
 \begin{itemize}
   \item Garby, Gordon \& Sands, \emph{The LLMbda Calculus},
     \href{https://arxiv.org/abs/2602.20064}{arXiv:2602.20064}.
@@ -785,7 +934,7 @@ development is entitled to make.
     and the reasoning behind each.
 \end{itemize}
 
-\paragraph{Classical information-flow-control background.}
+\paragraph{Classical Information-flow-control Background}
 \begin{itemize}
   \item Denning, \emph{A Lattice Model of Secure Information Flow},
     Communications of the ACM, 1976.
