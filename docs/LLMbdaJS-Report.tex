@@ -802,18 +802,12 @@ receives a response through \lstinline{recv}, and the result carries the
 join of every label the text passed through --- no separate tracking
 step, just the semantics running.
 
-\subsection{Worked example: the Fenton--Denning leak test}
-
 A regression test demonstrates that \lstinline{send}'s check actually
 rejects the attack it is meant to. The example constructs the classic
 covert-channel gadget --- branch on a secret, take an action visible on an
 untrusted channel depending on which branch ran --- and asserts that the
 interpreter throws a \lstinline{SecurityError} rather than letting the
 send through.
-
-Because it is regression-tested against the pre-fix source
-too, it is not just ``this looks right'' --- it is confirmed to actually
-catch the bug it names.
 
 \subsection{Testing discipline}
 
@@ -888,10 +882,8 @@ Here is some future work to bulletproof the implementation:
 \begin{itemize}
   \item Garby, Gordon \& Sands, \emph{The \LLMbda Calculus},
     \href{https://arxiv.org/abs/2602.20064}{arXiv:2602.20064}.
-  \item This repository's \texttt{README.md}, \texttt{ARCHITECTURE.md},
+  \item The repository's (\href{https://github.com/schlpbch/LLMbdaJS}{GitHub link}) \texttt{README.md}, \texttt{ARCHITECTURE.md},
     and \texttt{CONSTITUTION.md}.
-  \item \texttt{docs/adr/} --- the individual implementation decisions
-    and the reasoning behind each.
 \end{itemize}
 
 \paragraph{Classical information-flow-control background}
