@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * §E.2: `robust_endorse` stamps an "E" tag on anything it endorses, and
  * refuses (via a stuck `assert`) to endorse a value that already carries
  * that tag. This blocks endorsement *cascades* — the one gap the plain

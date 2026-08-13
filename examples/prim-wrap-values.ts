@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Regression test for the wrapValues fix in `prim`/`binop` (evaluator.ts).
  *
  * §B.1's ⇓-Prim rule requires a primitive's output be passed through

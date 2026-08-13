@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Coverage: `runProgram`'s `baseEnv` parameter (evaluator.ts) — merged
  * with the prelude env so a caller can inject extra top-level bindings
  * alongside prelude entries. Every other example that calls `runProgram`

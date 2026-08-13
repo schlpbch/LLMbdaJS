@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Regression test for the `camelLattice.readersFlowsTo` fix (lattice.ts).
  *
  * `readersFlowsTo` had its confidentiality direction inverted: it checked

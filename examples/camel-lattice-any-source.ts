@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Coverage: the `Sources: {kind: "any"}` case of `camelLattice`
  * (Appendix D.5) and joining two *different* restricted reader-sets
  * together — neither is exercised by `camel-provenance-quarantine.ts`

@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * §3.4's worked example: a secret-dependent `if` tries to upgrade the
  * conversation label to secret only on the branch where the secret holds,
  * mimicking the classic Fenton/Denning implicit-flow gadget CaMeL's

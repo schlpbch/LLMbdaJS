@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Label lattices — §3.2 and §5.2.
  *
  * The paper's theorems are proved for an *arbitrary* join-semilattice, and

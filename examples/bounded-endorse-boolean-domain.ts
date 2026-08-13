@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Regression test for the `bounded_endorse` boolean-domain fix
  * (prelude.ts).
  *

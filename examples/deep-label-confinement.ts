@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Regression test for the deepLabel fix in labelDyn/labelTest/labelAssert/
  * endorse (evaluator.ts).
  *

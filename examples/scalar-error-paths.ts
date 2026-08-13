@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Coverage: the "obviously ill-typed program" error paths that every
  * example so far has sidestepped by construction — `app` on a
  * non-closure, `field`/`index` on the wrong container kind or with a

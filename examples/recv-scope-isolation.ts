@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Regression test for the recv scope-isolation fix (evaluator.ts).
  *
  * §3.3's ⇓-Recv rule evaluates a freshly-parsed response as

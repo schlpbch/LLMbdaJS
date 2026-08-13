@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * §3.2's dynamic label form `e1 : e2` (`labelDyn` in ast.ts/evaluator.ts) —
  * every other example in this repo only uses `labelLit` (`l : e`), where
  * the label is a literal the program author wrote down ahead of time.

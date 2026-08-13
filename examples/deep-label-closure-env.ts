@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Regression test for the deepLabel-into-closure-environments fix
  * (evaluator.ts).
  *

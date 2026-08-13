@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Coverage: `recv`'s and `clear`'s *own* `SecurityError` checks
  * (§3.3's `pc ⊑ lc` side condition on both rules), triggered standalone.
  * Every existing leak example (`fenton-denning-leak.ts`,

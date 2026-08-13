@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Regression test for the model.ts error-type fix (model.ts).
  *
  * `errors.ts`'s own docstring states the point of splitting

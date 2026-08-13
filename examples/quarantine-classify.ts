@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * §5.1: read an untrusted email, classify it via a quarantined LLM call
  * (fork + clear, so the classification prompt never pollutes the main
  * conversation) that reads the email's content directly — so the

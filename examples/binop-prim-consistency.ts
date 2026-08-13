@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Regression test for the binop/prim consistency fix (evaluator.ts).
  *
  * §B.1 defines binary operators as sugar: `e1 ⊕ e2 ≜ prim "binop_⊕"

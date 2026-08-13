@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Regression test for the non-integer array index fix (evaluator.ts).
  *
  * §B.1's `⇓-ArrayIndex` takes an index via `Rat.num(i)` — the numerator

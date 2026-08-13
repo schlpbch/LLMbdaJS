@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * §2.1: extract and normalise a UK postcode from an address string,
  * using `fork` so each of several extractions is independent of the
  * others (the isolation mechanism that stands in for a dual-LLM split).

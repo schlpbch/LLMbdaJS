@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Prelude definitions — §C.5 (fix), §5.1 (quarantine), §E.2
  * (robust_endorse), §E.3 (bounded_endorse).
  *

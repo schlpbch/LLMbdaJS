@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Regression test for the var/field pc-confinement fix (evaluator.ts).
  *
  * This is a second instance of the Fenton/Denning implicit-flow pattern

@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Regression test for the duplicate-field-shadowing fix in `case
  * "record"` (evaluator.ts).
  *

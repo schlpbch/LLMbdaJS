@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Oracle abstraction — §6.
  *
  * The paper's peval interpreter is a pure function of an oracle

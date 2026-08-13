@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Coverage: `labelTest` (§3.2/§3.4's `e1 ? e2` — "test: labelled value e2
  * may flow to label e1, or not"). Every other example in this repo
  * exercises `labelAssert` (the blocking form) but none exercise the

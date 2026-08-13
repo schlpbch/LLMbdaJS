@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Appendix D.5: the CaMeL-style Sources×Readers lattice (`camelLattice`,
  * lattice.ts) as a genuine second lattice instance — every other example
  * in this repo uses the paper's {U,S}-powerset running example, so this

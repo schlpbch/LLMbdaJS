@@ -1,3 +1,6 @@
+/**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
 import type { BareValue, Env, Expr, Labeled, Value } from "./ast.js";
 import { SecurityError, RuntimeError } from "./errors.js";
 import type { FactoredLattice } from "./lattice.js";

@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * §2.2: a retry loop that keeps prompting until a response parses
  * successfully, feeding the previous error back into the next prompt.
  * This exercises `fix` (recursion via the paper's Y-combinator, §C.5)

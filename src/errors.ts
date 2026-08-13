@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Distinguishing SecurityError from RuntimeError matters: a SecurityError
  * is the interpreter refusing to perform an illegal information flow
  * (the `send` no-high-upgrade check, a failed `assert`) — this is the

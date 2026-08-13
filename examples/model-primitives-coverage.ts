@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Coverage: several small, independent gaps in `model.ts`'s default
  * implementations that no other example happens to exercise —
  * `shapeOf` for kinds other than number/string, the arithmetic/

@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Coverage: `endorse`'s `RuntimeError` when the current model's lattice
  * doesn't implement `FactoredLattice` (§5.2 requires the factoring
  * `L ≅ I×S` for `endorse` to be well-defined at all). Every other example

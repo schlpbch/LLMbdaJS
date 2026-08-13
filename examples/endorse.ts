@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Two tests in one file, both exercising `endorse` (§5) against the
  * factored {U,S}-powerset lattice (usFactoredLattice, lattice.ts):
  *

@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Coverage: `decodeLiteralLabel`'s "successfully decoded via
  * `Model.toLabel`" branch (evaluator.ts). Every other example passes
  * `labelLit` a raw TS label constant (e.g. `S = ["S"]`) directly — that

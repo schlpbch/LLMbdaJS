@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Minimal test runner: each examples/*.ts script exits 0 on success,
  * non-zero on failure, and prints its own PASS/FAIL lines. This just
  * runs them all in a child process each and aggregates the result —

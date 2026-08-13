@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * `clear` (§3.1) as the actual isolation mechanism behind `quarantine`
  * (§5.1, prelude.ts's `quarantineDef` = `fork(let _ = clear in @prompt)`).
  * examples/quarantine-classify.ts calls the prelude's `quarantine`

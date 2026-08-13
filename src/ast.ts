@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Abstract syntax for the LLMbda calculus.
  *
  * Mirrors the paper's grammar directly:

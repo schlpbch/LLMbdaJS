@@ -1,3 +1,6 @@
+/**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
 import type { BareValue, Expr, Scalar } from "./ast.js";
 import type { Lattice } from "./lattice.js";
 import { RuntimeError } from "./errors.js";

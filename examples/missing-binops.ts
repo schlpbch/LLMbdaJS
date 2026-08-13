@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) Andreas Schlapbach <schlpbch@asc.engineering>
+ */
+/**
  * Regression test for the missing `mod`/`!=` binop fix (evaluator.ts,
  * model.ts).
  *
